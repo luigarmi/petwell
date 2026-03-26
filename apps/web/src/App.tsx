@@ -34,7 +34,21 @@ function readStoredUser() {
 function scrollToTop() {
   if (typeof window !== "undefined") {
     window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+    document.documentElement.scrollTop = 0;
+    document.body.scrollTop = 0;
   }
+}
+
+function scheduleScrollToTop() {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  scrollToTop();
+  window.requestAnimationFrame(() => {
+    scrollToTop();
+    window.setTimeout(scrollToTop, 0);
+  });
 }
 
 function summarizeSyncFailures(failures: string[]) {
@@ -116,7 +130,7 @@ export function App() {
     setToken(nextToken);
     setUser(nextUser);
     setActivePortal(getDefaultPortal(nextUser));
-    scrollToTop();
+    scheduleScrollToTop();
     await loadDashboard(nextToken);
   }
 
@@ -241,6 +255,10 @@ export function App() {
   }, [token]);
 
   useEffect(() => {
+    scheduleScrollToTop();
+  }, [currentPortal, token, user?.id]);
+
+  useEffect(() => {
     if (typeof window === "undefined") {
       return;
     }
@@ -288,7 +306,7 @@ export function App() {
     setAuthMode("login");
     resetWorkspaceData();
     setStatus("Tu sesion se cerro correctamente.");
-    scrollToTop();
+    scheduleScrollToTop();
   }
 
   async function submitJson(path: string, body: Record<string, unknown>, method = "POST") {
@@ -529,7 +547,7 @@ export function App() {
             className={portal === currentPortal ? "is-active" : ""}
             onClick={() => {
               setActivePortal(portal);
-              scrollToTop();
+              scheduleScrollToTop();
             }}
           >
             <span>{portalTitle(portal)}</span>
