@@ -1,5 +1,5 @@
 import { FormEvent, useEffect, useState } from "react";
-import { api } from "./api.js";
+import { api, isUsingDemoBackend } from "./api.js";
 import { ActivityRail, AdminPortal, ClinicPortal, OwnerPortal } from "./portal-sections.js";
 import {
   getAvailablePortals,
@@ -22,6 +22,7 @@ import {
   type Role
 } from "./dashboard-models.js";
 import { buildMetrics } from "./dashboard-shared.js";
+import { getDemoCredentials } from "./demo-backend.js";
 
 function readStoredUser() {
   const raw = localStorage.getItem("petwell_user");
@@ -41,6 +42,7 @@ export function App() {
   const [user, setUser] = useState<SessionUser | null>(() => readStoredUser());
   const [activePortal, setActivePortal] = useState<Portal | null>(() => getDefaultPortal(readStoredUser()));
   const [status, setStatus] = useState("Conecta la plataforma y entra con tu rol.");
+  const [demoMode, setDemoMode] = useState(() => isUsingDemoBackend());
   const [loading, setLoading] = useState(false);
   const [authMode, setAuthMode] = useState<"login" | "register">("login");
   const [pets, setPets] = useState<Pet[]>([]);
@@ -70,6 +72,11 @@ export function App() {
     adminUsers,
     analytics
   });
+  const demoCredentials = getDemoCredentials();
+
+  function decorateStatus(message: string) {
+    return isUsingDemoBackend() ? `${message} Modo demo local activo.` : message;
+  }
 
   async function persistAndLoad(nextToken: string, nextUser: SessionUser) {
     localStorage.setItem("petwell_token", nextToken);
@@ -150,9 +157,9 @@ export function App() {
         usersResult.status === "rejected" ? "usuarios" : null
       ].filter(Boolean) as string[];
 
-      setStatus(summarizeSyncFailures(failedModules));
+      setStatus(decorateStatus(summarizeSyncFailures(failedModules)));
     } catch (error) {
-      setStatus(error instanceof Error ? error.message : "No fue posible sincronizar el portal.");
+      setStatus(decorateStatus(error instanceof Error ? error.message : "No fue posible sincronizar el portal."));
     } finally {
       setLoading(false);
     }
@@ -182,6 +189,20 @@ export function App() {
       void loadDashboard(token);
     }
   }, [token]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const handleRuntimeChange = (event: Event) => {
+      const nextMode = (event as CustomEvent<"remote" | "demo">).detail;
+      setDemoMode(nextMode === "demo");
+    };
+
+    window.addEventListener("petwell-runtime-mode", handleRuntimeChange as EventListener);
+    return () => window.removeEventListener("petwell-runtime-mode", handleRuntimeChange as EventListener);
+  }, []);
 
   useEffect(() => {
     const nextDefault = getDefaultPortal(user);
@@ -226,13 +247,13 @@ export function App() {
         method,
         body: JSON.stringify(body)
       });
-      setStatus("Operacion completada correctamente.");
+      setStatus(decorateStatus("Operacion completada correctamente."));
       await loadDashboard(token);
       if (selectedPetId && currentPortal !== "admin") {
         await loadClinicalData(selectedPetId, token);
       }
     } catch (error) {
-      setStatus(error instanceof Error ? error.message : "No fue posible completar la accion.");
+      setStatus(decorateStatus(error instanceof Error ? error.message : "No fue posible completar la accion."));
     }
   }
 
@@ -254,19 +275,19 @@ export function App() {
           })
         });
         await persistAndLoad(response.token, response.user);
-        setStatus("Cuenta OWNER creada y lista para usar.");
+        setStatus(decorateStatus("Cuenta OWNER creada y lista para usar."));
       } else {
         const response = await api<{ token: string; user: SessionUser }>("/users/login", undefined, {
           method: "POST",
           body: JSON.stringify({ email, password })
         });
         await persistAndLoad(response.token, response.user);
-        setStatus("Sesion iniciada.");
+        setStatus(decorateStatus("Sesion iniciada."));
       }
 
       event.currentTarget.reset();
     } catch (error) {
-      setStatus(error instanceof Error ? error.message : "No fue posible autenticar la sesion.");
+      setStatus(decorateStatus(error instanceof Error ? error.message : "No fue posible autenticar la sesion."));
     }
   }
 
@@ -342,6 +363,18 @@ export function App() {
             <span className="mini-label">Estado</span>
             <strong>{status}</strong>
           </div>
+
+          {demoMode ? (
+            <div className="status-card">
+              <span className="mini-label">Modo demo</span>
+              <strong>El sitio sigue operativo en este navegador.</strong>
+              <p>
+                Para revisar todos los portales usa <strong>{demoCredentials.email}</strong> con la clave{" "}
+                <strong>{demoCredentials.password}</strong>. Tambien puedes crear una cuenta OWNER y trabajar con datos
+                persistidos localmente.
+              </p>
+            </div>
+          ) : null}
         </section>
       </main>
     );

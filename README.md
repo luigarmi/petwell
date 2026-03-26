@@ -106,6 +106,11 @@ Configura esta variable en Vercel:
 
 Con eso, la app desplegada queda funcional sin depender de CORS del navegador.
 
+Si el gateway publico no esta disponible, el frontend activa un modo demo persistido en `localStorage` para que el despliegue siga siendo usable sin errores de red. Credenciales demo:
+
+- `admin@petwell.local`
+- `Admin123!`
+
 ### Llamada directa al gateway
 
 Si prefieres que el navegador llame directo al gateway, configura:

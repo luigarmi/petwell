@@ -606,6 +606,14 @@ export function AdminPortal(props: {
   updateRoles: (userId: string, roles: Role[]) => Promise<void>;
   submitJson: SubmitJson;
 }) {
+  function toggleRoles(currentRoles: Role[], role: Role) {
+    const nextRoles = currentRoles.includes(role)
+      ? currentRoles.filter((item) => item !== role)
+      : [...currentRoles, role];
+
+    return nextRoles.length ? nextRoles : (["OWNER"] as Role[]);
+  }
+
   return (
     <div className="portal-grid">
       <Panel eyebrow="Gobierno" title="Usuarios y roles">
@@ -629,7 +637,11 @@ export function AdminPortal(props: {
                 </div>
                 <div className="role-actions">
                   {ROLE_OPTIONS.map((role) => (
-                    <button key={role} type="button" onClick={() => void props.updateRoles(adminUser.id, [role])}>
+                    <button
+                      key={role}
+                      type="button"
+                      onClick={() => void props.updateRoles(adminUser.id, toggleRoles(adminUser.roles, role))}
+                    >
                       {role}
                     </button>
                   ))}

@@ -1,4 +1,39 @@
+import { handleDemoApiRequest } from "./demo-backend.js";
+
 export const API_BASE = __PETWELL_API_BASE__;
+
+type RuntimeMode = "remote" | "demo";
+
+let runtimeMode: RuntimeMode = "remote";
+
+function setRuntimeMode(mode: RuntimeMode) {
+  if (runtimeMode === mode) {
+    return;
+  }
+
+  runtimeMode = mode;
+
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new CustomEvent("petwell-runtime-mode", { detail: mode }));
+  }
+}
+
+export function isUsingDemoBackend() {
+  return runtimeMode === "demo";
+}
+
+function shouldUseDemoFallback(message: string) {
+  const lower = message.trim().toLowerCase();
+
+  return (
+    lower.includes("failed to fetch") ||
+    lower.includes("missing petwell_gateway_url") ||
+    lower.includes("gateway unavailable") ||
+    lower.includes("gateway route not found") ||
+    lower.includes("page could not be found") ||
+    lower.includes("not_found")
+  );
+}
 
 function resolveNetworkErrorMessage() {
   if (typeof window !== "undefined") {
@@ -79,18 +114,32 @@ async function readApiError(response: Response) {
   const text = (await response.text()).trim();
 
   if (!text) {
-    return `HTTP ${response.status}`;
+    return {
+      raw: `HTTP ${response.status}`,
+      normalized: `HTTP ${response.status}`
+    };
   }
 
   try {
     const parsed = JSON.parse(text) as { error?: string; message?: string };
-    return normalizeErrorMessage(parsed.error ?? parsed.message ?? text);
+    const raw = parsed.error ?? parsed.message ?? text;
+    return {
+      raw,
+      normalized: normalizeErrorMessage(raw)
+    };
   } catch {
-    return normalizeErrorMessage(text);
+    return {
+      raw: text,
+      normalized: normalizeErrorMessage(text)
+    };
   }
 }
 
 export async function api<T>(path: string, token?: string, init?: RequestInit): Promise<T> {
+  if (runtimeMode === "demo") {
+    return handleDemoApiRequest<T>(path, token, init);
+  }
+
   const headers = new Headers(init?.headers ?? {});
 
   if (!headers.has("content-type") && init?.body) {
@@ -109,11 +158,22 @@ export async function api<T>(path: string, token?: string, init?: RequestInit): 
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Failed to fetch";
+    if (shouldUseDemoFallback(message)) {
+      setRuntimeMode("demo");
+      return handleDemoApiRequest<T>(path, token, init);
+    }
     throw new Error(normalizeErrorMessage(message));
   }
 
   if (!response.ok) {
-    throw new Error(await readApiError(response));
+    const errorInfo = await readApiError(response);
+
+    if (shouldUseDemoFallback(errorInfo.raw) || shouldUseDemoFallback(errorInfo.normalized)) {
+      setRuntimeMode("demo");
+      return handleDemoApiRequest<T>(path, token, init);
+    }
+
+    throw new Error(errorInfo.normalized);
   }
 
   return response.json() as Promise<T>;
