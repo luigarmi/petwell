@@ -1,5 +1,5 @@
 import { FormEvent, useEffect, useState } from "react";
-import { API_BASE, api } from "./api.js";
+import { api } from "./api.js";
 import { ActivityRail, AdminPortal, ClinicPortal, OwnerPortal } from "./portal-sections.js";
 import {
   getAvailablePortals,
@@ -254,7 +254,7 @@ export function App() {
           })
         });
         await persistAndLoad(response.token, response.user);
-      setStatus("Cuenta OWNER creada y lista para usar.");
+        setStatus("Cuenta OWNER creada y lista para usar.");
       } else {
         const response = await api<{ token: string; user: SessionUser }>("/users/login", undefined, {
           method: "POST",
@@ -342,12 +342,6 @@ export function App() {
             <span className="mini-label">Estado</span>
             <strong>{status}</strong>
           </div>
-
-          <details className="support-panel">
-            <summary>Panel tecnico</summary>
-            <p>Frontend desplegado contra: {API_BASE}</p>
-            <p>En produccion necesitas un backend publico, `PETWELL_API_BASE` y CORS configurado.</p>
-          </details>
         </section>
       </main>
     );

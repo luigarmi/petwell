@@ -4,12 +4,22 @@ import { resolve } from "node:path";
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), "");
+  const configuredApiBase = env.PETWELL_API_BASE?.trim();
+  const pointsToLocalhost = Boolean(
+    configuredApiBase?.match(/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?/i)
+  );
+  const apiBase =
+    mode === "production"
+      ? configuredApiBase && !pointsToLocalhost
+        ? configuredApiBase
+        : "/api"
+      : configuredApiBase || "http://localhost:8080";
 
   return {
     plugins: [react()],
     root: resolve(process.cwd(), "apps/web"),
     define: {
-      __PETWELL_API_BASE__: JSON.stringify(env.PETWELL_API_BASE ?? "http://localhost:8080")
+      __PETWELL_API_BASE__: JSON.stringify(apiBase)
     },
     server: {
       host: "0.0.0.0",
