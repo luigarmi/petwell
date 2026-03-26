@@ -815,14 +815,14 @@ export async function handleDemoApiRequest<T>(path: string, token?: string, init
     return createDemoResponse({ invoice }) as T;
   }
 
+  if (cleanPath === "/payments/invoices" && method === "GET") {
+    return createDemoResponse({ invoices: visibleInvoices(currentUser, state) }) as T;
+  }
+
   const paymentMatch = matchPath(cleanPath, /^\/payments\/([^/]+)$/);
   if (paymentMatch && method === "GET") {
     const item = state.invoices.find((invoice) => invoice.appointmentId === paymentMatch[1]);
     return createDemoResponse({ payment: item?.payment ?? null, invoice: item?.invoice ?? null }) as T;
-  }
-
-  if (cleanPath === "/payments/invoices" && method === "GET") {
-    return createDemoResponse({ invoices: visibleInvoices(currentUser, state) }) as T;
   }
 
   if (cleanPath === "/telemed/rooms" && method === "GET") {

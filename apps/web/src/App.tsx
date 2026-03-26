@@ -59,6 +59,10 @@ function summarizeSyncFailures(failures: string[]) {
   return "Algunas secciones se estan actualizando. Puedes seguir usando el resto de la plataforma.";
 }
 
+function asArray<T>(value: T[] | null | undefined) {
+  return Array.isArray(value) ? value : [];
+}
+
 export function App() {
   const [token, setToken] = useState<string | null>(() => localStorage.getItem("petwell_token"));
   const [user, setUser] = useState<SessionUser | null>(() => readStoredUser());
@@ -181,16 +185,16 @@ export function App() {
         return;
       }
 
-      setClinics(settledValue(clinicsResult, { clinics: [] }).clinics);
-      setSchedules(settledValue(schedulesResult, { schedules: [] }).schedules);
-      setAppointments(settledValue(appointmentsResult, { appointments: [] }).appointments);
-      setNotifications(settledValue(notificationsResult, { notifications: [] }).notifications);
-      setInvoices(settledValue(invoicesResult, { invoices: [] }).invoices);
-      setTelemedRooms(settledValue(telemedResult, { rooms: [] }).rooms);
+      setClinics(asArray(settledValue(clinicsResult, { clinics: [] }).clinics));
+      setSchedules(asArray(settledValue(schedulesResult, { schedules: [] }).schedules));
+      setAppointments(asArray(settledValue(appointmentsResult, { appointments: [] }).appointments));
+      setNotifications(asArray(settledValue(notificationsResult, { notifications: [] }).notifications));
+      setInvoices(asArray(settledValue(invoicesResult, { invoices: [] }).invoices));
+      setTelemedRooms(asArray(settledValue(telemedResult, { rooms: [] }).rooms));
       setAnalytics(canSeeAnalytics ? settledValue(analyticsResult, null) : null);
-      setAdminUsers(settledValue(usersResult, { users: [] }).users);
+      setAdminUsers(asArray(settledValue(usersResult, { users: [] }).users));
 
-      const nextPets = settledValue(petsResult, { pets: [] }).pets;
+      const nextPets = asArray(settledValue(petsResult, { pets: [] }).pets);
       setPets(nextPets);
       setSelectedPetId((current) => {
         if (nextPets.some((pet) => pet.id === current)) {
@@ -238,9 +242,9 @@ export function App() {
       api<{ prescriptions: SimpleItem[] }>(`/ehr/pets/${petId}/prescriptions`, currentToken)
     ]);
 
-    setRecords(settledValue(recordsResult, { records: [] }).records);
-    setVaccinations(settledValue(vaccinationsResult, { vaccinations: [] }).vaccinations);
-    setPrescriptions(settledValue(prescriptionsResult, { prescriptions: [] }).prescriptions);
+    setRecords(asArray(settledValue(recordsResult, { records: [] }).records));
+    setVaccinations(asArray(settledValue(vaccinationsResult, { vaccinations: [] }).vaccinations));
+    setPrescriptions(asArray(settledValue(prescriptionsResult, { prescriptions: [] }).prescriptions));
   }
 
   useEffect(() => {

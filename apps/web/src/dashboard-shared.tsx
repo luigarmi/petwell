@@ -25,21 +25,29 @@ export function buildMetrics(
     analytics: AnalyticsSummary | null;
   }
 ): Metric[] {
+  const pets = Array.isArray(data.pets) ? data.pets : [];
+  const clinics = Array.isArray(data.clinics) ? data.clinics : [];
+  const appointments = Array.isArray(data.appointments) ? data.appointments : [];
+  const notifications = Array.isArray(data.notifications) ? data.notifications : [];
+  const invoices = Array.isArray(data.invoices) ? data.invoices : [];
+  const telemedRooms = Array.isArray(data.telemedRooms) ? data.telemedRooms : [];
+  const adminUsers = Array.isArray(data.adminUsers) ? data.adminUsers : [];
+
   if (portal === "clinic") {
     return [
       {
         label: "Pacientes",
-        value: String(data.pets.length),
+        value: String(pets.length),
         detail: "Mascotas atendidas por tu equipo"
       },
       {
         label: "Citas",
-        value: String(data.appointments.length),
+        value: String(appointments.length),
         detail: "Consultas programadas"
       },
       {
         label: "Mensajes",
-        value: String(data.notifications.length),
+        value: String(notifications.length),
         detail: "Novedades recientes"
       },
       {
@@ -54,17 +62,17 @@ export function buildMetrics(
     return [
       {
         label: "Usuarios",
-        value: String(data.adminUsers.length),
+        value: String(adminUsers.length),
         detail: "Personas registradas"
       },
       {
         label: "Sedes",
-        value: String(data.clinics.length),
+        value: String(clinics.length),
         detail: "Clinicas activas"
       },
       {
         label: "Actividad",
-        value: String(data.notifications.length),
+        value: String(notifications.length),
         detail: "Movimientos recientes"
       },
       {
@@ -78,22 +86,22 @@ export function buildMetrics(
   return [
     {
       label: "Mascotas",
-      value: String(data.pets.length),
+      value: String(pets.length),
       detail: "Perfiles creados"
     },
     {
       label: "Citas",
-      value: String(data.appointments.length),
+      value: String(appointments.length),
       detail: "Consultas programadas"
     },
     {
       label: "Pagos",
-      value: String(data.invoices.length),
+      value: String(invoices.length),
       detail: "Comprobantes disponibles"
     },
     {
       label: "Video llamadas",
-      value: String(data.telemedRooms.length),
+      value: String(telemedRooms.length),
       detail: "Consultas virtuales listas"
     }
   ];

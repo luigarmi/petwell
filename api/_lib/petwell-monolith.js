@@ -736,13 +736,13 @@ export async function handleDemoApiRequest(path, token, init) {
         writeState(state);
         return createDemoResponse({ invoice });
     }
+    if (cleanPath === "/payments/invoices" && method === "GET") {
+        return createDemoResponse({ invoices: visibleInvoices(currentUser, state) });
+    }
     const paymentMatch = matchPath(cleanPath, /^\/payments\/([^/]+)$/);
     if (paymentMatch && method === "GET") {
         const item = state.invoices.find((invoice) => invoice.appointmentId === paymentMatch[1]);
         return createDemoResponse({ payment: item?.payment ?? null, invoice: item?.invoice ?? null });
-    }
-    if (cleanPath === "/payments/invoices" && method === "GET") {
-        return createDemoResponse({ invoices: visibleInvoices(currentUser, state) });
     }
     if (cleanPath === "/telemed/rooms" && method === "GET") {
         return createDemoResponse({ rooms: visibleRooms(currentUser, state) });
