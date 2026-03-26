@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "build": "npm run build:web",
     "dev:gateway": "tsx watch apps/gateway/src/index.ts",
     "dev:user-service": "tsx watch apps/services/user-service/src/index.ts",
     "dev:pet-service": "tsx watch apps/services/pet-service/src/index.ts",
