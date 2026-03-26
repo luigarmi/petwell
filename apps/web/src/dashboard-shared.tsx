@@ -124,7 +124,7 @@ export function HistoryColumns(props: {
         {props.vaccinations.length ? (
           props.vaccinations.map((item) => (
             <span key={item.id}>
-              {item.vaccineCode} · {item.date}
+              {item.vaccineCode} / {item.date}
             </span>
           ))
         ) : (
@@ -137,7 +137,7 @@ export function HistoryColumns(props: {
         {props.prescriptions.length ? (
           props.prescriptions.map((item) => (
             <span key={item.id}>
-              {item.drug} · {item.dose}
+              {item.drug} / {item.dose}
             </span>
           ))
         ) : (

@@ -28,6 +28,14 @@ function readStoredUser() {
   return raw ? (JSON.parse(raw) as SessionUser) : null;
 }
 
+function summarizeSyncFailures(failures: string[]) {
+  if (!failures.length) {
+    return "Portal sincronizado y listo para operar.";
+  }
+
+  return `Vista cargada. Falta sincronizar: ${failures.join(", ")}.`;
+}
+
 export function App() {
   const [token, setToken] = useState<string | null>(() => localStorage.getItem("petwell_token"));
   const [user, setUser] = useState<SessionUser | null>(() => readStoredUser());
@@ -130,21 +138,21 @@ export function App() {
         return nextPets[0]?.id ?? "";
       });
 
-      const failures = [
-        clinicsResult,
-        schedulesResult,
-        appointmentsResult,
-        notificationsResult,
-        petsResult,
-        invoicesResult,
-        telemedResult,
-        analyticsResult,
-        usersResult
-      ].filter((result) => result.status === "rejected").length;
+      const failedModules = [
+        clinicsResult.status === "rejected" ? "sedes" : null,
+        schedulesResult.status === "rejected" ? "horarios" : null,
+        appointmentsResult.status === "rejected" ? "agenda" : null,
+        notificationsResult.status === "rejected" ? "avisos" : null,
+        petsResult.status === "rejected" ? "mascotas" : null,
+        invoicesResult.status === "rejected" ? "facturacion" : null,
+        telemedResult.status === "rejected" ? "telemedicina" : null,
+        analyticsResult.status === "rejected" ? "analitica" : null,
+        usersResult.status === "rejected" ? "usuarios" : null
+      ].filter(Boolean) as string[];
 
-      setStatus(failures ? `Datos sincronizados con ${failures} modulo(s) pendientes.` : "Datos sincronizados.");
+      setStatus(summarizeSyncFailures(failedModules));
     } catch (error) {
-      setStatus(error instanceof Error ? error.message : "No fue posible sincronizar.");
+      setStatus(error instanceof Error ? error.message : "No fue posible sincronizar el portal.");
     } finally {
       setLoading(false);
     }
@@ -218,13 +226,13 @@ export function App() {
         method,
         body: JSON.stringify(body)
       });
-      setStatus("Operacion completada.");
+      setStatus("Operacion completada correctamente.");
       await loadDashboard(token);
       if (selectedPetId && currentPortal !== "admin") {
         await loadClinicalData(selectedPetId, token);
       }
     } catch (error) {
-      setStatus(error instanceof Error ? error.message : "La operacion fallo.");
+      setStatus(error instanceof Error ? error.message : "No fue posible completar la accion.");
     }
   }
 
@@ -246,7 +254,7 @@ export function App() {
           })
         });
         await persistAndLoad(response.token, response.user);
-        setStatus("Cuenta OWNER creada.");
+      setStatus("Cuenta OWNER creada y lista para usar.");
       } else {
         const response = await api<{ token: string; user: SessionUser }>("/users/login", undefined, {
           method: "POST",
@@ -258,7 +266,7 @@ export function App() {
 
       event.currentTarget.reset();
     } catch (error) {
-      setStatus(error instanceof Error ? error.message : "No fue posible autenticar.");
+      setStatus(error instanceof Error ? error.message : "No fue posible autenticar la sesion.");
     }
   }
 
@@ -276,7 +284,7 @@ export function App() {
 
   if (!token || !user || !currentPortal) {
     return (
-      <main className="app-shell landing-shell">
+      <main className="app-shell landing-shell theme-owner">
         <section className="landing-hero">
           <div className="brand-lockup">
             <span className="brand-badge">PetWell</span>
@@ -346,7 +354,7 @@ export function App() {
   }
 
   return (
-    <main className="app-shell workspace-shell">
+    <main className={`app-shell workspace-shell theme-${currentPortal}`}>
       <header className="workspace-topbar">
         <div>
           <div className="brand-lockup compact">
@@ -375,6 +383,36 @@ export function App() {
           </div>
         </div>
       </header>
+
+      <section className="dashboard-hero">
+        <div className="dashboard-hero-copy">
+          <span className="hero-note">Experiencia activa</span>
+          <h2>{portalTitle(currentPortal)}</h2>
+          <p>{portalDescription(currentPortal)}</p>
+        </div>
+
+        <div className="dashboard-hero-glance">
+          <article className="hero-stat-card">
+            <span>Estado del portal</span>
+            <strong>{loading ? "Sincronizando" : "Operativo"}</strong>
+            <small>{status}</small>
+          </article>
+
+          <article className="hero-stat-card">
+            <span>Foco actual</span>
+            <strong>
+              {currentPortal === "admin"
+                ? "Supervision global"
+                : selectedPet?.name ?? (currentPortal === "clinic" ? "Paciente por seleccionar" : "Mascota por seleccionar")}
+            </strong>
+            <small>
+              {currentPortal === "admin"
+                ? "Usuarios, sedes y metricas del ecosistema."
+                : "Usa esta seleccion para seguir historia, agenda y operacion."}
+            </small>
+          </article>
+        </div>
+      </section>
 
       <section className="portal-switcher">
         {availablePortals.map((portal) => (
@@ -449,7 +487,13 @@ export function App() {
         </div>
 
         <aside className="workspace-rail">
-          <ActivityRail status={status} notifications={notifications} selectedPetName={selectedPet?.name} />
+          <ActivityRail
+            status={status}
+            loading={loading}
+            notifications={notifications}
+            selectedPetName={selectedPet?.name}
+            portalTitle={portalTitle(currentPortal)}
+          />
         </aside>
       </section>
     </main>

@@ -151,7 +151,7 @@ export function OwnerPortal(props: {
                 <option value="">Veterinario</option>
                 {props.schedules.map((schedule) => (
                   <option key={schedule.id} value={schedule.vetUserId}>
-                    {shortId(schedule.vetUserId)} · {dayName(schedule.dayOfWeek)} {schedule.start}-{schedule.end}
+                    {shortId(schedule.vetUserId)} / {dayName(schedule.dayOfWeek)} {schedule.start}-{schedule.end}
                   </option>
                 ))}
               </select>
@@ -328,7 +328,7 @@ export function ClinicPortal(props: {
                   <strong>{clinic.legalName}</strong>
                   <span>{clinic.address}</span>
                   <small>
-                    NIT {clinic.taxId} · Staff {clinic.staffCount ?? 0}
+                    NIT {clinic.taxId} / Staff {clinic.staffCount ?? 0}
                   </small>
                 </article>
               ))
@@ -663,7 +663,7 @@ export function AdminPortal(props: {
                   <strong>{clinic.legalName}</strong>
                   <span>{clinic.address}</span>
                   <small>
-                    NIT {clinic.taxId} · Staff {clinic.staffCount ?? 0}
+                    NIT {clinic.taxId} / Staff {clinic.staffCount ?? 0}
                   </small>
                 </article>
               ))
@@ -704,7 +704,7 @@ export function AdminPortal(props: {
                 <article key={`${clinic.clinicId}-${clinic.date}`} className="feed-card">
                   <div>
                     <strong>{shortId(clinic.clinicId)}</strong>
-                    <span>{clinic.appointments} citas · ocupacion {clinic.occupancy}%</span>
+                    <span>{clinic.appointments} citas / ocupacion {clinic.occupancy}%</span>
                   </div>
                   <small>${Math.round(clinic.revenue).toLocaleString("es-CO")}</small>
                 </article>
@@ -721,24 +721,38 @@ export function AdminPortal(props: {
 
 export function ActivityRail(props: {
   status: string;
+  loading: boolean;
   notifications: Notification[];
   selectedPetName?: string;
+  portalTitle: string;
 }) {
+  const lowerStatus = props.status.toLowerCase();
+  const state = props.loading
+    ? "syncing"
+    : lowerStatus.includes("no fue") || lowerStatus.includes("no tienes") || lowerStatus.includes("falta sincronizar")
+      ? "attention"
+      : "online";
+
   return (
     <div className="rail-stack">
-      <Panel eyebrow="Estado" title="Sincronizacion">
-        <div className="status-note">
+      <Panel eyebrow="Estado" title="Centro de control">
+        <div className={`signal-banner signal-${state}`}>
+          <span className="signal-chip">
+            {state === "syncing" ? "Sincronizando" : state === "attention" ? "Revisar" : "En linea"}
+          </span>
           <strong>{props.status}</strong>
-          <p>Si un modulo no responde en despliegue, verifica la URL publica del backend y CORS.</p>
+          <p>Si un modulo no responde en despliegue, revisa la URL publica del backend y la configuracion de CORS.</p>
         </div>
       </Panel>
 
-      <Panel eyebrow="Radar" title="Actividad reciente">
+      <Panel eyebrow="Radar" title="Linea de actividad">
         <div className="feed-group">
           {props.notifications.length ? (
             props.notifications.slice(0, 6).map((notification) => (
-              <article key={notification.id} className="feed-card">
-                <div>
+              <article key={notification.id} className="timeline-card">
+                <span className="timeline-dot" />
+                <div className="timeline-copy">
+                  <small className="timeline-tag">{notification.category}</small>
                   <strong>{notification.title}</strong>
                   <span>{notification.message}</span>
                 </div>
@@ -751,10 +765,16 @@ export function ActivityRail(props: {
         </div>
       </Panel>
 
-      <Panel eyebrow="Contexto" title="Selecciones activas">
-        <div className="selection-summary">
-          <span>Mascota enfocada</span>
-          <strong>{props.selectedPetName ?? "Sin seleccion"}</strong>
+      <Panel eyebrow="Contexto" title="Foco operativo">
+        <div className="context-grid">
+          <article className="context-card">
+            <span>Portal actual</span>
+            <strong>{props.portalTitle}</strong>
+          </article>
+          <article className="context-card">
+            <span>Mascota o paciente</span>
+            <strong>{props.selectedPetName ?? "Sin seleccion"}</strong>
+          </article>
         </div>
       </Panel>
     </div>
