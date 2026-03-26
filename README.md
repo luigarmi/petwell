@@ -99,20 +99,25 @@ Validaciones rapidas:
 
 ## Despliegue
 
-### Frontend en Vercel
+### Frontend full-stack en Vercel
 
-En produccion el frontend usa `/api` por defecto y delega las llamadas al proxy en [api/[...path].js](/c:/Users/luisa/Downloads/PetWell/api/[...path].js). Eso evita que el navegador apunte a `localhost`.
+En produccion el frontend usa `/api` por defecto y ahora puede resolver toda la logica dentro del mismo proyecto mediante [api/[...path].js](/c:/Users/luisa/Downloads/PetWell/api/[...path].js) y [api/_lib/petwell-monolith.js](/c:/Users/luisa/Downloads/PetWell/api/_lib/petwell-monolith.js).
 
-Configura esta variable en Vercel:
+La opcion recomendada es configurar una sola base de datos para esta API integrada:
 
+- `PETWELL_APP_DB_URL=postgres://usuario:clave@host/base`
+
+Opcionales:
+
+- `PETWELL_APP_DB_NAME=petwell_app`
+- `PETWELL_API_MODE=integrated`
+
+Si quieres forzar el uso del gateway externo en vez de la API integrada:
+
+- `PETWELL_API_MODE=proxy`
 - `PETWELL_GATEWAY_URL=https://tu-gateway-publico`
 
-Con eso, la app desplegada queda funcional sin depender de CORS del navegador.
-
-Si el gateway publico no esta disponible, el frontend activa un modo demo persistido en `localStorage` para que el despliegue siga siendo usable sin errores de red. Credenciales demo:
-
-- `admin@petwell.local`
-- `Admin123!`
+Si no hay base de datos integrada ni gateway publico, el frontend mantiene un recorrido local para que el despliegue no quede roto.
 
 ### Llamada directa al gateway
 

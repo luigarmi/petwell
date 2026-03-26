@@ -27,7 +27,9 @@ function shouldUseDemoFallback(message: string) {
 
   return (
     lower.includes("failed to fetch") ||
+    lower.includes("missing petwell_app_db_url") ||
     lower.includes("missing petwell_gateway_url") ||
+    lower.includes("integrated api unavailable") ||
     lower.includes("gateway unavailable") ||
     lower.includes("gateway route not found") ||
     lower.includes("page could not be found") ||
@@ -63,8 +65,16 @@ function normalizeErrorMessage(message: string) {
     return resolveNetworkErrorMessage();
   }
 
+  if (lower.includes("missing petwell_app_db_url")) {
+    return "Estamos terminando de conectar tu espacio. Puedes seguir recorriendo la plataforma mientras completamos la configuracion.";
+  }
+
   if (lower.includes("missing petwell_gateway_url")) {
     return "Estamos terminando de preparar tu espacio. Puedes seguir navegando mientras completamos la conexion.";
+  }
+
+  if (lower.includes("integrated api unavailable")) {
+    return "En este momento no pudimos abrir tu espacio completo. Intenta de nuevo en unos minutos.";
   }
 
   if (lower.includes("gateway unavailable")) {

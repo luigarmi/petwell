@@ -1,4 +1,9 @@
 import { buffer } from "node:stream/consumers";
+import {
+  canUseIntegratedApi,
+  handleIntegratedApiRequest,
+  isHttpError
+} from "./_lib/petwell-monolith.js";
 
 const hopByHopHeaders = new Set([
   "connection",
@@ -22,6 +27,10 @@ function getGatewayBaseUrl() {
   }
 
   return configured.replace(/\/+$/, "");
+}
+
+function shouldProxyToGateway() {
+  return (process.env.PETWELL_API_MODE ?? "").trim().toLowerCase() === "proxy";
 }
 
 function copyRequestHeaders(req) {
@@ -48,50 +57,47 @@ function setResponseHeaders(res, upstream) {
   });
 }
 
-export default async function handler(req, res) {
+function requestBaseUrl(req) {
+  const protocolHeader = req.headers["x-forwarded-proto"];
+  const hostHeader = req.headers["x-forwarded-host"] ?? req.headers.host;
+  const protocol = Array.isArray(protocolHeader)
+    ? protocolHeader[0]
+    : protocolHeader?.split(",")[0] || "https";
+  const host = Array.isArray(hostHeader) ? hostHeader[0] : hostHeader || "petwell.local";
+  return `${protocol}://${host}`;
+}
+
+function json(res, status, payload) {
+  res.statusCode = status;
+  res.setHeader("content-type", "application/json");
+  res.end(JSON.stringify(payload));
+}
+
+async function proxyToGateway(req, res, incomingUrl, rawBody) {
   const gatewayBaseUrl = getGatewayBaseUrl();
 
   if (!gatewayBaseUrl) {
-    res.statusCode = 500;
-    res.setHeader("content-type", "application/json");
-    res.end(
-      JSON.stringify({
-        error:
-          "Missing PETWELL_GATEWAY_URL. Configure the public gateway URL in the Vercel project."
-      })
-    );
+    json(res, 500, {
+      error: "Missing PETWELL_GATEWAY_URL. Configure the public gateway URL in the Vercel project."
+    });
     return;
   }
 
-  const incomingUrl = new URL(req.url ?? "/api", "https://petwell.local");
   const upstreamPath = incomingUrl.pathname.replace(/^\/api/, "") || "/";
   const targetUrl = new URL(`${gatewayBaseUrl}${upstreamPath}${incomingUrl.search}`);
-
   const headers = copyRequestHeaders(req);
-  let body;
-
-  if (req.method && !["GET", "HEAD"].includes(req.method.toUpperCase())) {
-    const rawBody = await buffer(req);
-    if (rawBody.length) {
-      body = rawBody;
-    }
-  }
 
   let upstream;
   try {
     upstream = await fetch(targetUrl, {
       method: req.method,
       headers,
-      body
+      body: rawBody?.length ? rawBody : undefined
     });
   } catch {
-    res.statusCode = 502;
-    res.setHeader("content-type", "application/json");
-    res.end(
-      JSON.stringify({
-        error: "Gateway unavailable. Verify PETWELL_GATEWAY_URL and the backend deployment."
-      })
-    );
+    json(res, 502, {
+      error: "Gateway unavailable. Verify PETWELL_GATEWAY_URL and the backend deployment."
+    });
     return;
   }
 
@@ -104,17 +110,57 @@ export default async function handler(req, res) {
     contentType.includes("text/html") &&
     (payloadText.includes("NOT_FOUND") || payloadText.toLowerCase().includes("page could not be found"))
   ) {
-    res.statusCode = 502;
-    res.setHeader("content-type", "application/json");
-    res.end(
-      JSON.stringify({
-        error: "Gateway route not found. Verify PETWELL_GATEWAY_URL and the backend deployment."
-      })
-    );
+    json(res, 502, {
+      error: "Gateway route not found. Verify PETWELL_GATEWAY_URL and the backend deployment."
+    });
     return;
   }
 
   setResponseHeaders(res, upstream);
   res.statusCode = upstream.status;
   res.end(payload);
+}
+
+export default async function handler(req, res) {
+  const incomingUrl = new URL(req.url ?? "/api", "https://petwell.local");
+  const rawBody =
+    req.method && !["GET", "HEAD"].includes(req.method.toUpperCase()) ? await buffer(req) : null;
+
+  const preferIntegrated = canUseIntegratedApi() && !shouldProxyToGateway();
+  if (preferIntegrated) {
+    try {
+      const result = await handleIntegratedApiRequest({
+        path: incomingUrl.pathname.replace(/^\/api/, "") || "/",
+        method: req.method ?? "GET",
+        token: req.headers.authorization?.startsWith("Bearer ")
+          ? req.headers.authorization.slice(7)
+          : undefined,
+        bodyText: rawBody?.length ? rawBody.toString("utf8") : "",
+        baseUrl: requestBaseUrl(req)
+      });
+
+      json(res, result.status, result.payload);
+      return;
+    } catch (error) {
+      if (isHttpError(error)) {
+        json(res, error.status, { error: error.message });
+        return;
+      }
+
+      json(res, 500, {
+        error: error instanceof Error ? error.message : "Integrated API unavailable."
+      });
+      return;
+    }
+  }
+
+  if (getGatewayBaseUrl()) {
+    await proxyToGateway(req, res, incomingUrl, rawBody);
+    return;
+  }
+
+  json(res, 500, {
+    error:
+      "Missing PETWELL_APP_DB_URL or PETWELL_GATEWAY_URL. Configure integrated database access or an external gateway."
+  });
 }

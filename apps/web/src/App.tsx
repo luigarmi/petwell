@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useEffect, useRef, useState } from "react";
 import { api, isUsingDemoBackend } from "./api.js";
 import { ActivityRail, AdminPortal, ClinicPortal, OwnerPortal } from "./portal-sections.js";
 import {
@@ -31,6 +31,12 @@ function readStoredUser() {
   return raw ? (JSON.parse(raw) as SessionUser) : null;
 }
 
+function scrollToTop() {
+  if (typeof window !== "undefined") {
+    window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+  }
+}
+
 function summarizeSyncFailures(failures: string[]) {
   if (!failures.length) {
     return "Todo esta listo para ti.";
@@ -60,6 +66,7 @@ export function App() {
   const [records, setRecords] = useState<SimpleItem[]>([]);
   const [vaccinations, setVaccinations] = useState<SimpleItem[]>([]);
   const [prescriptions, setPrescriptions] = useState<SimpleItem[]>([]);
+  const activeTokenRef = useRef<string | null>(token);
 
   const availablePortals = getAvailablePortals(user);
   const currentPortal = activePortal && availablePortals.includes(activePortal) ? activePortal : getDefaultPortal(user);
@@ -81,12 +88,35 @@ export function App() {
     return message;
   }
 
+  function isCurrentRequest(requestToken: string | null) {
+    return activeTokenRef.current === requestToken;
+  }
+
+  function resetWorkspaceData() {
+    setPets([]);
+    setClinics([]);
+    setSchedules([]);
+    setAppointments([]);
+    setNotifications([]);
+    setInvoices([]);
+    setTelemedRooms([]);
+    setAdminUsers([]);
+    setAnalytics(null);
+    setSelectedPetId("");
+    setRecords([]);
+    setVaccinations([]);
+    setPrescriptions([]);
+    setLoading(false);
+  }
+
   async function persistAndLoad(nextToken: string, nextUser: SessionUser) {
     localStorage.setItem("petwell_token", nextToken);
     localStorage.setItem("petwell_user", JSON.stringify(nextUser));
+    activeTokenRef.current = nextToken;
     setToken(nextToken);
     setUser(nextUser);
     setActivePortal(getDefaultPortal(nextUser));
+    scrollToTop();
     await loadDashboard(nextToken);
   }
 
@@ -98,6 +128,9 @@ export function App() {
     setLoading(true);
     try {
       const me = await api<{ user: SessionUser }>("/users/me", currentToken);
+      if (!isCurrentRequest(currentToken)) {
+        return;
+      }
       setUser(me.user);
 
       const canSeeTelemed = me.user.roles.includes("OWNER") || me.user.roles.includes("ADMIN");
@@ -129,6 +162,10 @@ export function App() {
         canSeeAnalytics ? api<AnalyticsSummary>("/analytics/summary", currentToken) : Promise.resolve(null),
         canSeeUsers ? api<{ users: AdminUser[] }>("/users/admin/users", currentToken) : Promise.resolve({ users: [] })
       ]);
+
+      if (!isCurrentRequest(currentToken)) {
+        return;
+      }
 
       setClinics(settledValue(clinicsResult, { clinics: [] }).clinics);
       setSchedules(settledValue(schedulesResult, { schedules: [] }).schedules);
@@ -162,9 +199,14 @@ export function App() {
 
       setStatus(decorateStatus(summarizeSyncFailures(failedModules)));
     } catch (error) {
+      if (!isCurrentRequest(currentToken)) {
+        return;
+      }
       setStatus(decorateStatus(error instanceof Error ? error.message : "No pudimos cargar tu informacion ahora mismo."));
     } finally {
-      setLoading(false);
+      if (isCurrentRequest(currentToken)) {
+        setLoading(false);
+      }
     }
   }
 
@@ -188,9 +230,14 @@ export function App() {
   }
 
   useEffect(() => {
+    activeTokenRef.current = token;
+
     if (token) {
       void loadDashboard(token);
+      return;
     }
+
+    resetWorkspaceData();
   }, [token]);
 
   useEffect(() => {
@@ -234,10 +281,14 @@ export function App() {
   function logout() {
     localStorage.removeItem("petwell_token");
     localStorage.removeItem("petwell_user");
+    activeTokenRef.current = null;
     setToken(null);
     setUser(null);
     setActivePortal(null);
+    setAuthMode("login");
+    resetWorkspaceData();
     setStatus("Tu sesion se cerro correctamente.");
+    scrollToTop();
   }
 
   async function submitJson(path: string, body: Record<string, unknown>, method = "POST") {
@@ -476,7 +527,10 @@ export function App() {
             key={portal}
             type="button"
             className={portal === currentPortal ? "is-active" : ""}
-            onClick={() => setActivePortal(portal)}
+            onClick={() => {
+              setActivePortal(portal);
+              scrollToTop();
+            }}
           >
             <span>{portalTitle(portal)}</span>
             <small>{portalDescription(portal)}</small>
