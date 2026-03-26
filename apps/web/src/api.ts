@@ -46,13 +46,13 @@ function resolveNetworkErrorMessage() {
         appUrl.hostname !== "127.0.0.1" &&
         (apiUrl.hostname === "localhost" || apiUrl.hostname === "127.0.0.1")
       ) {
-        return "El frontend esta publicado, pero sigue apuntando a localhost. Configura PETWELL_API_BASE con la URL publica del gateway.";
+        return "Estamos terminando de conectar tus datos. Mientras tanto puedes seguir explorando la plataforma.";
       }
     } catch {
     }
   }
 
-  return "No fue posible conectar con el servidor. Verifica que el backend este publicado y que CORS permita este dominio.";
+  return "En este momento no pudimos conectar tu informacion. Intenta de nuevo en unos minutos.";
 }
 
 function normalizeErrorMessage(message: string) {
@@ -64,47 +64,59 @@ function normalizeErrorMessage(message: string) {
   }
 
   if (lower.includes("missing petwell_gateway_url")) {
-    return "El despliegue no tiene configurada la URL publica del gateway. Define PETWELL_GATEWAY_URL en Vercel.";
+    return "Estamos terminando de preparar tu espacio. Puedes seguir navegando mientras completamos la conexion.";
   }
 
   if (lower.includes("gateway unavailable")) {
-    return "No fue posible conectar con el gateway publico. Verifica el despliegue del backend.";
+    return "En este momento no pudimos cargar toda la informacion. Vuelve a intentarlo mas tarde.";
   }
 
   if (lower.includes("gateway route not found") || lower.includes("page could not be found") || lower.includes("not_found")) {
-    return "La URL publica del gateway no responde con la API esperada. Revisa PETWELL_GATEWAY_URL y el despliegue del backend.";
+    return "Tu informacion aun se esta preparando. Puedes seguir usando la plataforma mientras completamos la conexion.";
+  }
+
+  if (lower.includes("invalid email or password") || lower.includes("invalid credentials")) {
+    return "El correo o la contrasena no coinciden. Revisa tus datos e intenta de nuevo.";
+  }
+
+  if (lower.includes("missing required registration fields")) {
+    return "Completa los datos principales para crear tu cuenta.";
+  }
+
+  if (lower.includes("email already registered")) {
+    return "Ese correo ya tiene una cuenta. Intenta entrar o usa otro correo.";
   }
 
   if (lower.includes("invalid input syntax for type uuid")) {
-    return "Uno de los datos enviados no tiene un identificador valido. Recarga el portal e intenta de nuevo.";
+    return "Uno de los datos no se pudo guardar. Revisa la informacion e intenta otra vez.";
   }
 
   if (lower.includes("clinic access denied")) {
-    return "No tienes acceso a la clinica seleccionada.";
+    return "No puedes ver la informacion de esa clinica.";
   }
 
   if (lower.includes("insufficient permissions")) {
-    return "Tu rol no tiene permisos para ejecutar esta accion.";
+    return "Esta opcion no esta disponible para tu perfil.";
   }
 
   if (lower.includes("record access denied") || lower.includes("vaccination access denied")) {
-    return "No tienes permiso para consultar la historia clinica de esta mascota.";
+    return "No puedes ver la historia clinica de esta mascota.";
   }
 
   if (lower.includes("active ehr consent required")) {
-    return "Esta accion requiere un consentimiento EHR activo.";
+    return "Primero necesitas una autorizacion activa para continuar.";
   }
 
   if (lower.includes("selected time slot is no longer available")) {
-    return "Ese horario ya no esta disponible. Elige otra franja.";
+    return "Ese horario ya no esta disponible. Elige otro.";
   }
 
   if (lower.includes("requested slot is outside the registered availability")) {
-    return "La cita esta fuera de la disponibilidad configurada.";
+    return "La hora elegida no esta disponible.";
   }
 
   if (lower.includes("pet ownership required")) {
-    return "Solo el propietario de la mascota puede realizar esta accion.";
+    return "Solo la persona responsable de la mascota puede hacer este cambio.";
   }
 
   return cleaned || "No fue posible completar la solicitud.";
@@ -187,5 +199,5 @@ export function formatDate(value?: string) {
 }
 
 export function dayName(day: number) {
-  return ["Dom", "Lun", "Mar", "Mie", "Jue", "Vie", "Sab"][day] ?? `Dia ${day}`;
+  return ["Domingo", "Lunes", "Martes", "Miercoles", "Jueves", "Viernes", "Sabado"][day] ?? `Dia ${day}`;
 }

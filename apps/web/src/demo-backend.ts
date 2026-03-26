@@ -155,7 +155,7 @@ function createInitialState(): DemoState {
     status: "ACTIVE",
     roles: ["OWNER", "CLINIC_ADMIN", "VET", "RECEPTIONIST", "ADMIN"],
     clinicIds: [DEMO_CLINIC_ID],
-    fullName: "PetWell Demo Admin"
+    fullName: "Equipo PetWell"
   };
 
   return {
@@ -196,8 +196,8 @@ function createInitialState(): DemoState {
       createNotification(
         "demo-note-0001",
         "SYSTEM",
-        "Modo demo activo",
-        "El backend publico no esta disponible. La plataforma opera en modo demo persistido en este navegador.",
+        "Tu espacio esta listo",
+        "Ya puedes recorrer la plataforma y conocer cada seccion con tranquilidad.",
         { userId: DEMO_ADMIN_ID, clinicId: DEMO_CLINIC_ID, createdAt }
       )
     ],
@@ -259,7 +259,7 @@ function parseBody(init?: RequestInit) {
   }
 }
 
-function unauthorized(message = "Demo authentication required"): never {
+function unauthorized(message = "Authentication required"): never {
   throw new Error(message);
 }
 
@@ -455,8 +455,8 @@ export async function handleDemoApiRequest<T>(path: string, token?: string, init
     addNotification(
       state,
       "ACCOUNT",
-      "Nueva cuenta OWNER",
-      `${user.fullName} ya puede operar en PetWell.`,
+      "Cuenta creada",
+      `${user.fullName} ya puede empezar a usar PetWell.`,
       { userId: user.id }
     );
     writeState(state);
@@ -511,8 +511,8 @@ export async function handleDemoApiRequest<T>(path: string, token?: string, init
     addNotification(
       state,
       "GOVERNANCE",
-      "Roles actualizados",
-      `Se actualizaron los roles de ${target.fullName}.`,
+      "Permisos actualizados",
+      `Se actualizo el acceso de ${target.fullName}.`,
       { userId: target.id }
     );
     writeState(state);
@@ -525,7 +525,7 @@ export async function handleDemoApiRequest<T>(path: string, token?: string, init
     const clinic: Clinic = {
       id: nextId(state, "clinic"),
       legalName: String(body.legalName ?? "Nueva clinica"),
-      taxId: String(body.taxId ?? "Sin NIT"),
+      taxId: String(body.taxId ?? "No registrado"),
       address: String(body.address ?? "Direccion pendiente"),
       staffCount: 0
     };
@@ -541,7 +541,7 @@ export async function handleDemoApiRequest<T>(path: string, token?: string, init
       staffRole: "CLINIC_ADMIN"
     });
     ensureClinicStaffCount(state);
-    addNotification(state, "CLINIC", "Clinica creada", `${clinic.legalName} ya esta disponible.`, {
+    addNotification(state, "CLINIC", "Sede creada", `${clinic.legalName} ya esta lista para empezar a atender.`, {
       clinicId: clinic.id
     });
     writeState(state);
@@ -583,7 +583,7 @@ export async function handleDemoApiRequest<T>(path: string, token?: string, init
     addNotification(
       state,
       "CLINIC",
-      "Staff vinculado",
+      "Equipo actualizado",
       `${targetUser.fullName} fue asignado a ${clinic.legalName}.`,
       { clinicId }
     );
@@ -641,8 +641,8 @@ export async function handleDemoApiRequest<T>(path: string, token?: string, init
     addNotification(
       state,
       "EHR",
-      "Consentimiento activo",
-      `Se habilito el acceso clinico al expediente de ${pet.name}.`,
+      "Acceso autorizado",
+      `La clinica ya puede revisar la informacion de ${pet.name}.`,
       { userId: currentUser.id, clinicId: consent.clinicId }
     );
     writeState(state);
@@ -669,8 +669,8 @@ export async function handleDemoApiRequest<T>(path: string, token?: string, init
     addNotification(
       state,
       "SCHEDULE",
-      "Horario actualizado",
-      `Se registro disponibilidad para la clinica ${schedule.clinicId}.`,
+      "Horario listo",
+      "La disponibilidad ya quedo organizada.",
       { clinicId: schedule.clinicId }
     );
     writeState(state);
@@ -706,7 +706,7 @@ export async function handleDemoApiRequest<T>(path: string, token?: string, init
       state,
       "APPOINTMENT",
       "Cita creada",
-      `La cita de ${pet.name} quedo pendiente de pago.`,
+      `La cita de ${pet.name} ya quedo reservada y esta pendiente de pago.`,
       { userId: currentUser.id, clinicId: appointment.clinicId }
     );
     writeState(state);
@@ -727,8 +727,8 @@ export async function handleDemoApiRequest<T>(path: string, token?: string, init
       addNotification(
         state,
         "APPOINTMENT",
-        "Atencion finalizada",
-        "La cita fue marcada como completada.",
+        "Consulta finalizada",
+        "La atencion ya fue marcada como finalizada.",
         { clinicId: appointment.clinicId, userId: appointment.ownerUserId }
       );
     } else if (action === "confirm") {
@@ -786,7 +786,7 @@ export async function handleDemoApiRequest<T>(path: string, token?: string, init
       state,
       "BILLING",
       "Pago confirmado",
-      `Se registro el pago de ${Math.round(Number(body.amount ?? 95000)).toLocaleString("es-CO")} y la cita avanza a confirmacion.`,
+      `Se registro el pago de ${Math.round(Number(body.amount ?? 95000)).toLocaleString("es-CO")} y la cita quedo confirmada.`,
       { userId: currentUser.id, clinicId: appointment.clinicId }
     );
     addNotification(state, "APPOINTMENT", "Cita confirmada", "La cita ya quedo confirmada y visible en tu agenda.", {
@@ -805,8 +805,8 @@ export async function handleDemoApiRequest<T>(path: string, token?: string, init
       addNotification(
         state,
         "TELEMED",
-        "Sala virtual disponible",
-        `La sala ${room.roomCode} ya esta lista para la consulta remota.`,
+        "Video consulta lista",
+        "La sala virtual ya esta lista para entrar.",
         { userId: currentUser.id, clinicId: appointment.clinicId }
       );
     }
@@ -891,8 +891,8 @@ export async function handleDemoApiRequest<T>(path: string, token?: string, init
     addNotification(
       state,
       "CLINICAL",
-      "Historia clinica actualizada",
-      `Se registro una actualizacion clinica de tipo RECORD.`,
+      "Consulta guardada",
+      "Se guardo una nueva nota de consulta.",
       { clinicId: record.clinicId, userId: pet.ownerIds[0] }
     );
     writeState(state);
@@ -920,7 +920,7 @@ export async function handleDemoApiRequest<T>(path: string, token?: string, init
       state,
       "CLINICAL",
       "Vacunacion registrada",
-      `Se aplico la vacuna ${vaccination.vaccineCode}.`,
+      `Se registro la vacuna ${vaccination.vaccineCode}.`,
       { clinicId: vaccination.clinicId, userId: pet.ownerIds[0] }
     );
     writeState(state);
@@ -952,8 +952,8 @@ export async function handleDemoApiRequest<T>(path: string, token?: string, init
     addNotification(
       state,
       "CLINICAL",
-      "Prescripcion emitida",
-      `Se emitio la formula de ${prescription.drug}.`,
+      "Tratamiento guardado",
+      `Se guardo la indicacion de ${prescription.drug}.`,
       { clinicId: prescription.clinicId, userId: pet.ownerIds[0] }
     );
     writeState(state);
@@ -1005,5 +1005,5 @@ export async function handleDemoApiRequest<T>(path: string, token?: string, init
     }) as T;
   }
 
-  throw new Error(`Demo route not implemented: ${method} ${cleanPath}`);
+  throw new Error(`Route not implemented: ${method} ${cleanPath}`);
 }

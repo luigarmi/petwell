@@ -170,22 +170,96 @@ export function getDefaultPortal(user: SessionUser | null): Portal | null {
 export function portalTitle(portal: Portal) {
   switch (portal) {
     case "owner":
-      return "Portal propietario";
+      return "Inicio";
     case "clinic":
-      return "Portal clinico";
+      return "Atencion";
     case "admin":
-      return "Portal administracion";
+      return "Gestion";
   }
 }
 
 export function portalDescription(portal: Portal) {
   switch (portal) {
     case "owner":
-      return "Mascotas, consentimientos, citas, pagos y seguimiento clinico.";
+      return "Tus mascotas, citas y pagos organizados en un solo lugar.";
     case "clinic":
-      return "Agenda, pacientes, atencion clinica, staff y operacion de sede.";
+      return "Pacientes, agenda y mensajes claros para el trabajo del dia.";
     case "admin":
-      return "Usuarios, roles, sedes y supervision global del ecosistema.";
+      return "Personas, sedes y movimiento general con una vista simple.";
+  }
+}
+
+export function roleLabel(role: Role) {
+  switch (role) {
+    case "OWNER":
+      return "Propietario";
+    case "CLINIC_ADMIN":
+      return "Administrador de clinica";
+    case "VET":
+      return "Veterinario";
+    case "RECEPTIONIST":
+      return "Recepcion";
+    case "ADMIN":
+      return "Gestion central";
+  }
+}
+
+export function appointmentTypeLabel(type: string) {
+  return type === "TELEMED" ? "Video consulta" : "Consulta presencial";
+}
+
+export function appointmentStatusLabel(status: string) {
+  switch (status) {
+    case "PENDING_PAYMENT":
+      return "Pendiente de pago";
+    case "CONFIRMED":
+      return "Confirmada";
+    case "COMPLETED":
+      return "Finalizada";
+    case "CANCELLED":
+      return "Cancelada";
+    default:
+      return status;
+  }
+}
+
+export function userStatusLabel(status: string) {
+  switch (status) {
+    case "ACTIVE":
+      return "Cuenta activa";
+    default:
+      return status;
+  }
+}
+
+export function notificationCategoryLabel(category: string) {
+  switch (category) {
+    case "SYSTEM":
+      return "Novedad";
+    case "ACCOUNT":
+      return "Cuenta";
+    case "CLINIC":
+      return "Clinica";
+    case "PET":
+      return "Mascota";
+    case "APPOINTMENT":
+      return "Cita";
+    case "BILLING":
+      return "Pago";
+    case "TELEMED":
+      return "Video consulta";
+    case "CLINICAL":
+      return "Atencion";
+    case "EHR":
+      return "Atencion";
+    case "MANUAL":
+      return "Mensaje";
+    case "SCHEDULE":
+      return "Horario";
+    case "GOVERNANCE":
+      return "Permisos";
+    default:
+      return "Actualizacion";
   }
 }
 

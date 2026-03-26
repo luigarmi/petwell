@@ -30,22 +30,22 @@ export function buildMetrics(
       {
         label: "Pacientes",
         value: String(data.pets.length),
-        detail: "Mascotas visibles para la sede"
+        detail: "Mascotas atendidas por tu equipo"
       },
       {
         label: "Citas",
         value: String(data.appointments.length),
-        detail: "Agenda cargada en el portal clinico"
+        detail: "Consultas programadas"
       },
       {
-        label: "Avisos",
+        label: "Mensajes",
         value: String(data.notifications.length),
-        detail: "Notificaciones operativas"
+        detail: "Novedades recientes"
       },
       {
-        label: "Revenue",
+        label: "Ingresos",
         value: `$${Math.round(data.analytics?.global?.revenue ?? 0).toLocaleString("es-CO")}`,
-        detail: "Resumen segun eventos procesados"
+        detail: "Resumen del periodo"
       }
     ];
   }
@@ -55,22 +55,22 @@ export function buildMetrics(
       {
         label: "Usuarios",
         value: String(data.adminUsers.length),
-        detail: "Usuarios cargados para asignacion de roles"
+        detail: "Personas registradas"
       },
       {
         label: "Sedes",
         value: String(data.clinics.length),
-        detail: "Clinicas registradas en la plataforma"
+        detail: "Clinicas activas"
       },
       {
-        label: "Eventos",
+        label: "Actividad",
         value: String(data.notifications.length),
-        detail: "Actividad reciente del ecosistema"
+        detail: "Movimientos recientes"
       },
       {
-        label: "Revenue",
+        label: "Ingresos",
         value: `$${Math.round(data.analytics?.global?.revenue ?? 0).toLocaleString("es-CO")}`,
-        detail: "Ingreso agregado disponible"
+        detail: "Total acumulado"
       }
     ];
   }
@@ -79,22 +79,22 @@ export function buildMetrics(
     {
       label: "Mascotas",
       value: String(data.pets.length),
-      detail: "Perfiles registrados"
+      detail: "Perfiles creados"
     },
     {
       label: "Citas",
       value: String(data.appointments.length),
-      detail: "Agenda activa del propietario"
+      detail: "Consultas programadas"
     },
     {
-      label: "Facturas",
+      label: "Pagos",
       value: String(data.invoices.length),
-      detail: "Pagos e invoices asociados"
+      detail: "Comprobantes disponibles"
     },
     {
-      label: "Salas",
+      label: "Video llamadas",
       value: String(data.telemedRooms.length),
-      detail: "Telemedicina lista para usar"
+      detail: "Consultas virtuales listas"
     }
   ];
 }
@@ -107,7 +107,7 @@ export function HistoryColumns(props: {
   return (
     <div className="history-grid">
       <article className="history-card">
-        <strong>Records</strong>
+        <strong>Consultas</strong>
         {props.records.length ? (
           props.records.map((item) => (
             <span key={item.id}>
@@ -115,7 +115,7 @@ export function HistoryColumns(props: {
             </span>
           ))
         ) : (
-          <span className="muted">Sin registros clinicos visibles.</span>
+          <span className="muted">Todavia no hay notas de consulta para mostrar.</span>
         )}
       </article>
 
@@ -128,12 +128,12 @@ export function HistoryColumns(props: {
             </span>
           ))
         ) : (
-          <span className="muted">Sin vacunaciones visibles.</span>
+          <span className="muted">Todavia no hay vacunas registradas.</span>
         )}
       </article>
 
       <article className="history-card">
-        <strong>Prescripciones</strong>
+        <strong>Tratamientos</strong>
         {props.prescriptions.length ? (
           props.prescriptions.map((item) => (
             <span key={item.id}>
@@ -141,7 +141,7 @@ export function HistoryColumns(props: {
             </span>
           ))
         ) : (
-          <span className="muted">Sin prescripciones visibles.</span>
+          <span className="muted">Todavia no hay tratamientos registrados.</span>
         )}
       </article>
     </div>

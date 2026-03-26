@@ -24,6 +24,8 @@ import {
 import { buildMetrics } from "./dashboard-shared.js";
 import { getDemoCredentials } from "./demo-backend.js";
 
+const LANDING_STATUS = "Ingresa o crea tu cuenta para empezar.";
+
 function readStoredUser() {
   const raw = localStorage.getItem("petwell_user");
   return raw ? (JSON.parse(raw) as SessionUser) : null;
@@ -31,17 +33,17 @@ function readStoredUser() {
 
 function summarizeSyncFailures(failures: string[]) {
   if (!failures.length) {
-    return "Portal sincronizado y listo para operar.";
+    return "Todo esta listo para ti.";
   }
 
-  return `Vista cargada. Falta sincronizar: ${failures.join(", ")}.`;
+  return "Algunas secciones se estan actualizando. Puedes seguir usando el resto de la plataforma.";
 }
 
 export function App() {
   const [token, setToken] = useState<string | null>(() => localStorage.getItem("petwell_token"));
   const [user, setUser] = useState<SessionUser | null>(() => readStoredUser());
   const [activePortal, setActivePortal] = useState<Portal | null>(() => getDefaultPortal(readStoredUser()));
-  const [status, setStatus] = useState("Conecta la plataforma y entra con tu rol.");
+  const [status, setStatus] = useState(LANDING_STATUS);
   const [demoMode, setDemoMode] = useState(() => isUsingDemoBackend());
   const [loading, setLoading] = useState(false);
   const [authMode, setAuthMode] = useState<"login" | "register">("login");
@@ -62,6 +64,7 @@ export function App() {
   const availablePortals = getAvailablePortals(user);
   const currentPortal = activePortal && availablePortals.includes(activePortal) ? activePortal : getDefaultPortal(user);
   const selectedPet = pets.find((pet) => pet.id === selectedPetId) ?? null;
+  const showLandingStatus = status !== LANDING_STATUS;
   const metrics = buildMetrics(currentPortal, {
     pets,
     clinics,
@@ -75,7 +78,7 @@ export function App() {
   const demoCredentials = getDemoCredentials();
 
   function decorateStatus(message: string) {
-    return isUsingDemoBackend() ? `${message} Modo demo local activo.` : message;
+    return message;
   }
 
   async function persistAndLoad(nextToken: string, nextUser: SessionUser) {
@@ -159,7 +162,7 @@ export function App() {
 
       setStatus(decorateStatus(summarizeSyncFailures(failedModules)));
     } catch (error) {
-      setStatus(decorateStatus(error instanceof Error ? error.message : "No fue posible sincronizar el portal."));
+      setStatus(decorateStatus(error instanceof Error ? error.message : "No pudimos cargar tu informacion ahora mismo."));
     } finally {
       setLoading(false);
     }
@@ -234,7 +237,7 @@ export function App() {
     setToken(null);
     setUser(null);
     setActivePortal(null);
-    setStatus("Sesion cerrada.");
+    setStatus("Tu sesion se cerro correctamente.");
   }
 
   async function submitJson(path: string, body: Record<string, unknown>, method = "POST") {
@@ -247,13 +250,13 @@ export function App() {
         method,
         body: JSON.stringify(body)
       });
-      setStatus(decorateStatus("Operacion completada correctamente."));
+      setStatus(decorateStatus("Listo. Ya guardamos tu informacion."));
       await loadDashboard(token);
       if (selectedPetId && currentPortal !== "admin") {
         await loadClinicalData(selectedPetId, token);
       }
     } catch (error) {
-      setStatus(decorateStatus(error instanceof Error ? error.message : "No fue posible completar la accion."));
+      setStatus(decorateStatus(error instanceof Error ? error.message : "No pudimos completar este paso."));
     }
   }
 
@@ -275,19 +278,19 @@ export function App() {
           })
         });
         await persistAndLoad(response.token, response.user);
-        setStatus(decorateStatus("Cuenta OWNER creada y lista para usar."));
+        setStatus(decorateStatus("Tu cuenta ya esta lista."));
       } else {
         const response = await api<{ token: string; user: SessionUser }>("/users/login", undefined, {
           method: "POST",
           body: JSON.stringify({ email, password })
         });
         await persistAndLoad(response.token, response.user);
-        setStatus(decorateStatus("Sesion iniciada."));
+        setStatus(decorateStatus("Bienvenido de nuevo."));
       }
 
       event.currentTarget.reset();
     } catch (error) {
-      setStatus(decorateStatus(error instanceof Error ? error.message : "No fue posible autenticar la sesion."));
+      setStatus(decorateStatus(error instanceof Error ? error.message : "No pudimos iniciar tu sesion."));
     }
   }
 
@@ -303,37 +306,63 @@ export function App() {
     });
   }
 
+  async function openQuickAccess() {
+    try {
+      const response = await api<{ token: string; user: SessionUser }>("/users/login", undefined, {
+        method: "POST",
+        body: JSON.stringify({
+          email: demoCredentials.email,
+          password: demoCredentials.password
+        })
+      });
+      await persistAndLoad(response.token, response.user);
+      setStatus("Listo. Ya puedes recorrer cada espacio con calma.");
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : "No fue posible abrir el recorrido.");
+    }
+  }
+
   if (!token || !user || !currentPortal) {
     return (
       <main className="app-shell landing-shell theme-owner">
         <section className="landing-hero">
           <div className="brand-lockup">
             <span className="brand-badge">PetWell</span>
-            <span className="hero-note">Veterinaria digital para propietarios, sedes y administracion</span>
+            <span className="hero-note">Cuidado veterinario simple y cercano</span>
           </div>
-          <h1>Una experiencia clara para cuidar mascotas sin mezclar operacion, clinica y gobierno.</h1>
+          <h1>Todo lo importante para tu mascota, en un solo lugar.</h1>
           <p>
-            La plataforma centraliza agenda, EHR, pagos, telemedicina y analitica. Cada rol entra a su propio
-            portal para evitar ruido visual y errores de operacion.
+            Agenda citas, revisa recomendaciones, consulta el historial y manten tu informacion al dia sin vueltas ni
+            pantallas confusas.
           </p>
 
           <div className="hero-highlights">
             <article>
-              <strong>Portal propietario</strong>
-              <span>Mascotas, consentimientos, citas, pagos y seguimiento.</span>
+              <strong>Citas sin enredos</strong>
+              <span>Reserva, reprograma y sigue cada consulta desde el mismo espacio.</span>
             </article>
             <article>
-              <strong>Portal clinico</strong>
-              <span>Agenda, pacientes, registros, staff y mensajeria operativa.</span>
+              <strong>Historia siempre a mano</strong>
+              <span>Vacunas, formulas y recomendaciones organizadas para cada mascota.</span>
             </article>
             <article>
-              <strong>Portal admin</strong>
-              <span>Usuarios, roles, sedes y supervision global del ecosistema.</span>
+              <strong>Atencion continua</strong>
+              <span>Pagos, recordatorios y video consulta listos cuando los necesites.</span>
             </article>
           </div>
         </section>
 
         <section className="auth-card">
+          <div className="auth-copy">
+            <span className="mini-label">Acceso</span>
+            <h2>{authMode === "register" ? "Crea tu cuenta" : "Bienvenido de nuevo"}</h2>
+            <p>
+              {authMode === "register"
+                ? "Empieza en menos de un minuto y deja lista la informacion de tus mascotas."
+                : "Entra para revisar citas, pagos, novedades y el cuidado de cada mascota."}
+            </p>
+          </div>
+
           <div className="auth-toggle">
             <button
               type="button"
@@ -352,27 +381,30 @@ export function App() {
           </div>
 
           <form className="stack-form" onSubmit={handleAuth}>
-            {authMode === "register" ? <input name="fullName" placeholder="Nombre completo" required /> : null}
-            <input name="email" type="email" placeholder="Correo" required />
-            {authMode === "register" ? <input name="phone" placeholder="Telefono" required /> : null}
+            {authMode === "register" ? <input name="fullName" placeholder="Tu nombre completo" required /> : null}
+            <input name="email" type="email" placeholder="Correo electronico" required />
+            {authMode === "register" ? <input name="phone" placeholder="Celular" required /> : null}
             <input name="password" type="password" placeholder="Contrasena" required />
-            <button type="submit">{authMode === "register" ? "Crear cuenta OWNER" : "Entrar a PetWell"}</button>
+            <button type="submit">{authMode === "register" ? "Crear mi cuenta" : "Entrar"}</button>
           </form>
 
-          <div className="status-card">
-            <span className="mini-label">Estado</span>
-            <strong>{status}</strong>
-          </div>
+          {showLandingStatus ? (
+            <div className="status-card">
+              <span className="mini-label">Mensaje</span>
+              <strong>{status}</strong>
+            </div>
+          ) : null}
 
           {demoMode ? (
-            <div className="status-card">
-              <span className="mini-label">Modo demo</span>
-              <strong>El sitio sigue operativo en este navegador.</strong>
+            <div className="status-card quick-access-card">
+              <span className="mini-label">Recorrido guiado</span>
+              <strong>Explora la plataforma sin empezar desde cero.</strong>
               <p>
-                Para revisar todos los portales usa <strong>{demoCredentials.email}</strong> con la clave{" "}
-                <strong>{demoCredentials.password}</strong>. Tambien puedes crear una cuenta OWNER y trabajar con datos
-                persistidos localmente.
+                Si quieres conocer cada espacio antes de cargar tus propios datos, entra con un recorrido ya listo.
               </p>
+              <button type="button" className="secondary-button quick-access-button" onClick={() => void openQuickAccess()}>
+                Explorar ahora
+              </button>
             </div>
           ) : null}
         </section>
@@ -394,15 +426,14 @@ export function App() {
 
         <div className="topbar-actions">
           <div className="chip-row">
-            {user.roles.map((role) => (
-              <span key={role} className="soft-chip">
-                {role}
-              </span>
-            ))}
+            <span className="soft-chip">Cuenta activa</span>
+            {availablePortals.length > 1 ? (
+              <span className="soft-chip">{availablePortals.length} espacios disponibles</span>
+            ) : null}
           </div>
           <div className="action-row">
             <button type="button" className="secondary-button" onClick={() => void loadDashboard(token)}>
-              {loading ? "Sincronizando..." : "Actualizar"}
+              {loading ? "Actualizando..." : "Actualizar"}
             </button>
             <button type="button" className="secondary-button" onClick={logout}>
               Cerrar sesion
@@ -413,29 +444,27 @@ export function App() {
 
       <section className="dashboard-hero">
         <div className="dashboard-hero-copy">
-          <span className="hero-note">Experiencia activa</span>
+          <span className="hero-note">Resumen del dia</span>
           <h2>{portalTitle(currentPortal)}</h2>
           <p>{portalDescription(currentPortal)}</p>
         </div>
 
         <div className="dashboard-hero-glance">
           <article className="hero-stat-card">
-            <span>Estado del portal</span>
-            <strong>{loading ? "Sincronizando" : "Operativo"}</strong>
+            <span>Estado</span>
+            <strong>{loading ? "Actualizando" : "Todo en orden"}</strong>
             <small>{status}</small>
           </article>
 
           <article className="hero-stat-card">
-            <span>Foco actual</span>
+            <span>Ahora mismo</span>
             <strong>
-              {currentPortal === "admin"
-                ? "Supervision global"
-                : selectedPet?.name ?? (currentPortal === "clinic" ? "Paciente por seleccionar" : "Mascota por seleccionar")}
+              {currentPortal === "admin" ? "Vista general" : selectedPet?.name ?? "Elige una mascota para continuar"}
             </strong>
             <small>
               {currentPortal === "admin"
-                ? "Usuarios, sedes y metricas del ecosistema."
-                : "Usa esta seleccion para seguir historia, agenda y operacion."}
+                ? "Revisa personas, sedes y movimiento reciente."
+                : "Al seleccionar una mascota veras su historia, citas y novedades."}
             </small>
           </article>
         </div>

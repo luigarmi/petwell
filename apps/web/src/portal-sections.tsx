@@ -2,12 +2,15 @@ import { dayName, formatDate } from "./api.js";
 import { InlineForm, Panel } from "./components.js";
 import {
   ROLE_OPTIONS,
+  appointmentStatusLabel,
+  appointmentTypeLabel,
   canCompleteAppointments,
   canManageStaff,
   canSendNotifications,
   canWriteEhr,
   hasRole,
-  shortId,
+  notificationCategoryLabel,
+  roleLabel,
   type AdminUser,
   type AnalyticsSummary,
   type Appointment,
@@ -41,12 +44,15 @@ export function OwnerPortal(props: {
   payAppointment: (appointmentId: string) => Promise<void>;
 }) {
   const selectedPet = props.pets.find((pet) => pet.id === props.selectedPetId) ?? null;
+  const clinicNames = new Map(props.clinics.map((clinic) => [clinic.id, clinic.legalName]));
+  const petNames = new Map(props.pets.map((pet) => [pet.id, pet.name]));
+  const appointmentsById = new Map(props.appointments.map((appointment) => [appointment.id, appointment]));
 
   return (
     <div className="portal-grid">
-      <Panel eyebrow="Perfil" title="Mascotas y permisos">
+      <Panel eyebrow="Mascotas" title="Tu espacio de cuidado">
         <div className="panel-copy">
-          <p>Registra perfiles y habilita el acceso clinico antes de cada atencion.</p>
+          <p>Registra a tus mascotas, mantén sus datos al dia y comparte acceso con tu clinica cuando lo necesites.</p>
         </div>
         <div className="form-cluster two-up">
           <InlineForm
@@ -71,8 +77,8 @@ export function OwnerPortal(props: {
           />
 
           <InlineForm
-            title="Consentimiento EHR"
-            fields={[{ name: "scope", placeholder: "Alcance autorizado" }]}
+            title="Autorizar a tu clinica"
+            fields={[{ name: "scope", placeholder: "Que puede consultar la clinica" }]}
             extraField={
               <>
                 <select name="petId" required>
@@ -110,21 +116,20 @@ export function OwnerPortal(props: {
                 <span className="entity-kicker">{pet.species}</span>
                 <strong>{pet.name}</strong>
                 <span>{pet.breed}</span>
-                <small>{shortId(pet.id)}</small>
               </button>
             ))
           ) : (
-            <EmptyState text="Todavia no hay mascotas registradas para este propietario." />
+            <EmptyState text="Todavia no has registrado mascotas." />
           )}
         </div>
       </Panel>
 
-      <Panel eyebrow="Agenda" title="Reserva una consulta">
+      <Panel eyebrow="Citas" title="Agenda una consulta">
         <div className="panel-copy">
-          <p>Elige mascota, sede y franja disponible. La cita nace en pendiente de pago.</p>
+          <p>Elige la mascota, la clinica y la hora que mejor te funcione.</p>
         </div>
         <InlineForm
-          title="Nueva cita"
+          title="Programar cita"
           fields={[
             { name: "startTime", type: "datetime-local", placeholder: "Inicio" },
             { name: "endTime", type: "datetime-local", placeholder: "Fin" }
@@ -148,16 +153,17 @@ export function OwnerPortal(props: {
                 ))}
               </select>
               <select name="vetUserId" required>
-                <option value="">Veterinario</option>
+                <option value="">Profesional disponible</option>
                 {props.schedules.map((schedule) => (
                   <option key={schedule.id} value={schedule.vetUserId}>
-                    {shortId(schedule.vetUserId)} / {dayName(schedule.dayOfWeek)} {schedule.start}-{schedule.end}
+                    {(clinicNames.get(schedule.clinicId) ?? "Clinica")} · {dayName(schedule.dayOfWeek)} · {schedule.start} a{" "}
+                    {schedule.end}
                   </option>
                 ))}
               </select>
               <select name="type" required>
                 <option value="IN_PERSON">Presencial</option>
-                <option value="TELEMED">Telemedicina</option>
+                <option value="TELEMED">Video consulta</option>
               </select>
             </>
           }
@@ -172,7 +178,7 @@ export function OwnerPortal(props: {
         />
       </Panel>
 
-      <Panel eyebrow="Seguimiento" title="Citas, pagos y salas">
+      <Panel eyebrow="Seguimiento" title="Tus citas y pagos">
         <div className="feed-columns">
           <div className="feed-group">
             <h3>Citas</h3>
@@ -180,63 +186,74 @@ export function OwnerPortal(props: {
               props.appointments.map((appointment) => (
                 <article key={appointment.id} className="feed-card">
                   <div>
-                    <strong>{appointment.type === "TELEMED" ? "Telemedicina" : "Presencial"}</strong>
+                    <strong>{appointmentTypeLabel(appointment.type)}</strong>
                     <span>{formatDate(appointment.startTime)}</span>
+                    <small>
+                      {petNames.get(appointment.petId) ?? "Mascota"} ·{" "}
+                      {clinicNames.get(appointment.clinicId) ?? "Clinica"}
+                    </small>
                   </div>
                   <div className="feed-actions">
-                    <span className={`status-pill status-${appointment.status.toLowerCase()}`}>{appointment.status}</span>
+                    <span className={`status-pill status-${appointment.status.toLowerCase()}`}>
+                      {appointmentStatusLabel(appointment.status)}
+                    </span>
                     {appointment.status === "PENDING_PAYMENT" ? (
                       <button type="button" onClick={() => void props.payAppointment(appointment.id)}>
-                        Pagar 95.000
+                        Pagar consulta
                       </button>
                     ) : null}
                   </div>
                 </article>
               ))
             ) : (
-              <EmptyState text="Aun no hay citas registradas." />
+              <EmptyState text="Aun no tienes citas programadas." />
             )}
           </div>
 
           <div className="feed-group">
-            <h3>Facturas</h3>
+            <h3>Comprobantes</h3>
             {props.invoices.length ? (
               props.invoices.map((item) => (
                 <article key={item.invoice.id} className="feed-card">
                   <div>
-                    <strong>Factura {shortId(item.invoice.id)}</strong>
-                    <span>{item.invoice.status}</span>
+                    <strong>Pago registrado</strong>
+                    <span>{formatDate(item.invoice.issuedAt)}</span>
+                    <small>
+                      {petNames.get(appointmentsById.get(item.appointmentId)?.petId ?? "") ?? "Consulta"} ·{" "}
+                      {clinicNames.get(appointmentsById.get(item.appointmentId)?.clinicId ?? "") ?? "Clinica"}
+                    </small>
                   </div>
                   <small>${item.invoice.total.toLocaleString("es-CO")}</small>
                 </article>
               ))
             ) : (
-              <EmptyState text="Las facturas apareceran despues del pago." />
+              <EmptyState text="Tus comprobantes apareceran aqui despues del pago." />
             )}
           </div>
 
           <div className="feed-group">
-            <h3>Salas telemedicina</h3>
+            <h3>Video consultas</h3>
             {props.telemedRooms.length ? (
               props.telemedRooms.map((room) => (
                 <article key={room.appointmentId} className="feed-card">
                   <div>
-                    <strong>{room.roomCode}</strong>
+                    <strong>Sala lista</strong>
                     <span>{formatDate(room.createdAt)}</span>
+                    <small>{petNames.get(appointmentsById.get(room.appointmentId)?.petId ?? "") ?? "Consulta virtual"}</small>
                   </div>
                   <a href={room.roomUrl} target="_blank" rel="noreferrer">
-                    Abrir sala
+                    Abrir
                   </a>
                 </article>
               ))
             ) : (
-              <EmptyState text="No hay salas activas todavia." />
+              <EmptyState text="Todavia no tienes video consultas activas." />
             )}
           </div>
         </div>
       </Panel>
 
-      <Panel eyebrow="Historial" title={selectedPet ? `Historia visible de ${selectedPet.name}` : "Historia visible"}>
+      <Panel eyebrow="Historia clinica" title={selectedPet ? selectedPet.name : "Selecciona una mascota"}>
         {selectedPet ? (
           <HistoryColumns
             records={props.records}
@@ -244,7 +261,7 @@ export function OwnerPortal(props: {
             prescriptions={props.prescriptions}
           />
         ) : (
-          <EmptyState text="Selecciona una mascota para revisar su historial." />
+          <EmptyState text="Selecciona una mascota para ver sus consultas, vacunas y tratamientos." />
         )}
       </Panel>
     </div>
@@ -266,32 +283,34 @@ export function ClinicPortal(props: {
   submitJson: SubmitJson;
 }) {
   const selectedPet = props.pets.find((pet) => pet.id === props.selectedPetId) ?? null;
+  const clinicNames = new Map(props.clinics.map((clinic) => [clinic.id, clinic.legalName]));
+  const petNames = new Map(props.pets.map((pet) => [pet.id, pet.name]));
 
   return (
     <div className="portal-grid">
       {(hasRole(props.user, "CLINIC_ADMIN") || canManageStaff(props.user)) && (
-        <Panel eyebrow="Operacion" title="Sede y staff">
+        <Panel eyebrow="Clinica" title="Sede y equipo">
           <div className="panel-copy">
-            <p>Configura la sede y vincula al personal segun el contexto de la clinica.</p>
+            <p>Mantén ordenadas tus sedes y define quién atiende cada servicio sin llenar la pantalla de ruido.</p>
           </div>
           <div className="form-cluster two-up">
             {hasRole(props.user, "CLINIC_ADMIN") ? (
               <InlineForm
-                title="Crear clinica"
+                title="Nueva sede"
                 fields={[
-                  { name: "legalName", placeholder: "Razon social" },
-                  { name: "taxId", placeholder: "NIT" },
-                  { name: "address", placeholder: "Direccion" }
+                  { name: "legalName", placeholder: "Nombre de la clinica" },
+                  { name: "taxId", placeholder: "Identificacion tributaria" },
+                  { name: "address", placeholder: "Ciudad o direccion" }
                 ]}
-                submitLabel="Crear sede"
+                submitLabel="Guardar sede"
                 onSubmit={(data) => props.submitJson("/users/clinics", data)}
               />
             ) : null}
 
             {canManageStaff(props.user) ? (
               <InlineForm
-                title="Vincular staff"
-                fields={[{ name: "userId", placeholder: "ID del usuario" }]}
+                title="Agregar miembro"
+                fields={[{ name: "userId", placeholder: "Codigo interno de la persona" }]}
                 extraField={
                   <>
                     <select name="clinicId" required>
@@ -303,13 +322,13 @@ export function ClinicPortal(props: {
                       ))}
                     </select>
                     <select name="staffRole" required>
-                      <option value="CLINIC_ADMIN">CLINIC_ADMIN</option>
-                      <option value="VET">VET</option>
-                      <option value="RECEPTIONIST">RECEPTIONIST</option>
+                      <option value="CLINIC_ADMIN">Administrador de clinica</option>
+                      <option value="VET">Veterinario</option>
+                      <option value="RECEPTIONIST">Recepcion</option>
                     </select>
                   </>
                 }
-                submitLabel="Vincular"
+                submitLabel="Agregar al equipo"
                 onSubmit={(data) =>
                   props.submitJson(`/users/clinics/${String(data.clinicId)}/staff`, {
                     userId: data.userId,
@@ -327,38 +346,45 @@ export function ClinicPortal(props: {
                   <span className="entity-kicker">Sede</span>
                   <strong>{clinic.legalName}</strong>
                   <span>{clinic.address}</span>
-                  <small>
-                    NIT {clinic.taxId} / Staff {clinic.staffCount ?? 0}
-                  </small>
+                  <small>{clinic.staffCount ?? 0} personas en el equipo</small>
                 </article>
               ))
             ) : (
-              <EmptyState text="No hay clinicas disponibles para este usuario." />
+              <EmptyState text="Todavia no hay sedes disponibles para esta cuenta." />
             )}
           </div>
         </Panel>
       )}
 
-      <Panel eyebrow="Agenda" title="Disponibilidad y seguimiento">
+      <Panel eyebrow="Agenda" title="Horarios y consultas">
         <div className="form-cluster">
           <InlineForm
-            title="Crear horario"
+            title="Nuevo horario"
             fields={[
-              { name: "vetUserId", placeholder: "ID del veterinario" },
-              { name: "dayOfWeek", type: "number", placeholder: "0-6" },
-              { name: "start", type: "time", placeholder: "Inicio" },
-              { name: "end", type: "time", placeholder: "Fin" },
-              { name: "slotMinutes", type: "number", placeholder: "Minutos por slot" }
+              { name: "vetUserId", placeholder: "Codigo interno del profesional" },
+              { name: "start", type: "time", placeholder: "Desde" },
+              { name: "end", type: "time", placeholder: "Hasta" },
+              { name: "slotMinutes", type: "number", placeholder: "Duracion de cada cita (min)" }
             ]}
             extraField={
-              <select name="clinicId" required>
-                <option value="">Clinica</option>
-                {props.clinics.map((clinic) => (
-                  <option key={clinic.id} value={clinic.id}>
-                    {clinic.legalName}
-                  </option>
-                ))}
-              </select>
+              <>
+                <select name="dayOfWeek" required>
+                  <option value="">Dia de atencion</option>
+                  {[0, 1, 2, 3, 4, 5, 6].map((day) => (
+                    <option key={day} value={day}>
+                      {dayName(day)}
+                    </option>
+                  ))}
+                </select>
+                <select name="clinicId" required>
+                  <option value="">Clinica</option>
+                  {props.clinics.map((clinic) => (
+                    <option key={clinic.id} value={clinic.id}>
+                      {clinic.legalName}
+                    </option>
+                  ))}
+                </select>
+              </>
             }
             submitLabel="Guardar horario"
             onSubmit={(data) => props.submitJson("/appointments/schedules", data)}
@@ -367,38 +393,44 @@ export function ClinicPortal(props: {
 
         <div className="feed-columns">
           <div className="feed-group">
-            <h3>Citas activas</h3>
+            <h3>Consultas programadas</h3>
             {props.appointments.length ? (
               props.appointments.map((appointment) => (
                 <article key={appointment.id} className="feed-card">
                   <div>
-                    <strong>{appointment.type === "TELEMED" ? "Telemedicina" : "Presencial"}</strong>
+                    <strong>{appointmentTypeLabel(appointment.type)}</strong>
                     <span>{formatDate(appointment.startTime)}</span>
+                    <small>
+                      {petNames.get(appointment.petId) ?? "Paciente"} ·{" "}
+                      {clinicNames.get(appointment.clinicId) ?? "Clinica"}
+                    </small>
                   </div>
                   <div className="feed-actions">
-                    <span className={`status-pill status-${appointment.status.toLowerCase()}`}>{appointment.status}</span>
+                    <span className={`status-pill status-${appointment.status.toLowerCase()}`}>
+                      {appointmentStatusLabel(appointment.status)}
+                    </span>
                     {appointment.status === "CONFIRMED" && canCompleteAppointments(props.user) ? (
                       <button
                         type="button"
                         onClick={() => void props.submitJson(`/appointments/${appointment.id}/complete`, {})}
                       >
-                        Completar
+                        Marcar como finalizada
                       </button>
                     ) : null}
                   </div>
                 </article>
               ))
             ) : (
-              <EmptyState text="La agenda aun no tiene citas visibles." />
+              <EmptyState text="Aun no hay consultas programadas." />
             )}
           </div>
 
           <div className="feed-group">
-            <h3>Indicadores</h3>
+            <h3>Resumen</h3>
             {props.analytics?.global ? (
               <div className="kpi-stack">
                 <article className="mini-kpi">
-                  <span>Revenue</span>
+                  <span>Ingresos</span>
                   <strong>${Math.round(props.analytics.global.revenue).toLocaleString("es-CO")}</strong>
                 </article>
                 <article className="mini-kpi">
@@ -406,18 +438,18 @@ export function ClinicPortal(props: {
                   <strong>{props.analytics.global.totalAppointments}</strong>
                 </article>
                 <article className="mini-kpi">
-                  <span>Telemed</span>
+                  <span>Video consultas</span>
                   <strong>{props.analytics.global.telemedCount}</strong>
                 </article>
               </div>
             ) : (
-              <EmptyState text="La analitica aparecera cuando existan eventos operativos." />
+              <EmptyState text="El resumen aparecera cuando haya movimiento en la agenda." />
             )}
           </div>
         </div>
       </Panel>
 
-      <Panel eyebrow="Pacientes" title="Historia clinica visible">
+      <Panel eyebrow="Pacientes" title="Pacientes y seguimiento">
         <div className="entity-grid">
           {props.pets.length ? (
             props.pets.map((pet) => (
@@ -430,11 +462,11 @@ export function ClinicPortal(props: {
                 <span className="entity-kicker">{pet.species}</span>
                 <strong>{pet.name}</strong>
                 <span>{pet.breed}</span>
-                <small>{shortId(pet.id)}</small>
+                <small>{clinicNames.get(pet.primaryClinicId) ?? "Clinica principal"}</small>
               </button>
             ))
           ) : (
-            <EmptyState text="No hay pacientes visibles para esta sede." />
+            <EmptyState text="Todavia no hay pacientes visibles para esta sede." />
           )}
         </div>
 
@@ -445,19 +477,19 @@ export function ClinicPortal(props: {
             prescriptions={props.prescriptions}
           />
         ) : (
-          <EmptyState text="Selecciona un paciente para ver su historial." />
+          <EmptyState text="Selecciona un paciente para ver su historia clinica." />
         )}
       </Panel>
 
       <div className="split-panels">
         {canWriteEhr(props.user) ? (
-          <Panel eyebrow="EHR" title="Registrar atencion">
+          <Panel eyebrow="Atencion" title="Registrar consulta">
             <div className="form-cluster">
               <InlineForm
-                title="Nuevo record"
+                title="Notas de la consulta"
                 fields={[
-                  { name: "reason", placeholder: "Motivo" },
-                  { name: "notes", placeholder: "Notas clinicas" }
+                  { name: "reason", placeholder: "Motivo de la visita" },
+                  { name: "notes", placeholder: "Lo mas importante de la atencion" }
                 ]}
                 extraField={
                   <>
@@ -479,14 +511,14 @@ export function ClinicPortal(props: {
                     </select>
                   </>
                 }
-                submitLabel="Guardar record"
+                submitLabel="Guardar consulta"
                 onSubmit={(data) => props.submitJson("/ehr/records", data)}
               />
 
               <InlineForm
-                title="Vacunacion"
+                title="Vacuna aplicada"
                 fields={[
-                  { name: "vaccineCode", placeholder: "Codigo" },
+                  { name: "vaccineCode", placeholder: "Nombre de la vacuna" },
                   { name: "date", type: "date", placeholder: "Fecha" },
                   { name: "batch", placeholder: "Lote" }
                 ]}
@@ -515,14 +547,14 @@ export function ClinicPortal(props: {
               />
 
               <InlineForm
-                title="Prescripcion"
+                title="Tratamiento indicado"
                 fields={[
                   { name: "drug", placeholder: "Medicamento" },
                   { name: "dose", placeholder: "Dosis" },
                   { name: "frequency", placeholder: "Frecuencia" },
                   { name: "start", type: "date", placeholder: "Inicio" },
                   { name: "end", type: "date", placeholder: "Fin" },
-                  { name: "notes", placeholder: "Notas" }
+                  { name: "notes", placeholder: "Indicaciones" }
                 ]}
                 extraField={
                   <>
@@ -544,7 +576,7 @@ export function ClinicPortal(props: {
                     </select>
                   </>
                 }
-                submitLabel="Emitir prescripcion"
+                submitLabel="Guardar tratamiento"
                 onSubmit={(data) => props.submitJson("/ehr/prescriptions", data)}
               />
             </div>
@@ -552,24 +584,24 @@ export function ClinicPortal(props: {
         ) : null}
 
         {canSendNotifications(props.user) ? (
-          <Panel eyebrow="Comunicacion" title="Notificaciones">
+          <Panel eyebrow="Comunicacion" title="Mensajes">
             <InlineForm
-              title="Mensaje manual"
+              title="Enviar mensaje"
               fields={[
-                { name: "title", placeholder: "Titulo" },
+                { name: "title", placeholder: "Asunto" },
                 { name: "message", placeholder: "Mensaje" }
               ]}
               extraField={
                 <>
                   <select name="clinicId">
-                    <option value="">Clinica opcional</option>
+                    <option value="">Enviar a toda la clinica (opcional)</option>
                     {props.clinics.map((clinic) => (
                       <option key={clinic.id} value={clinic.id}>
                         {clinic.legalName}
                       </option>
                     ))}
                   </select>
-                  <input name="userId" placeholder="Usuario opcional" />
+                  <input name="userId" placeholder="Codigo interno de la persona (opcional)" />
                 </>
               }
               submitLabel="Enviar"
@@ -577,7 +609,7 @@ export function ClinicPortal(props: {
             />
 
             <div className="feed-group">
-              <h3>Ultimos avisos</h3>
+              <h3>Mensajes recientes</h3>
               {props.notifications.length ? (
                 props.notifications.slice(0, 5).map((notification) => (
                   <article key={notification.id} className="feed-card">
@@ -589,7 +621,7 @@ export function ClinicPortal(props: {
                   </article>
                 ))
               ) : (
-                <EmptyState text="No hay avisos manuales recientes." />
+                <EmptyState text="Todavia no hay mensajes recientes." />
               )}
             </div>
           </Panel>
@@ -616,54 +648,56 @@ export function AdminPortal(props: {
 
   return (
     <div className="portal-grid">
-      <Panel eyebrow="Gobierno" title="Usuarios y roles">
+      <Panel eyebrow="Personas" title="Usuarios y permisos">
         <div className="panel-copy">
-          <p>Los roles elevados se asignan desde este contexto para evitar exposicion publica de privilegios.</p>
+          <p>Organiza accesos y deja visible solo lo necesario para cada persona.</p>
         </div>
         <div className="entity-grid users-grid">
           {props.users.length ? (
             props.users.map((adminUser) => (
               <article key={adminUser.id} className="entity-card">
-                <span className="entity-kicker">{adminUser.status}</span>
+                <span className="entity-kicker">{adminUser.status === "ACTIVE" ? "Cuenta activa" : adminUser.status}</span>
                 <strong>{adminUser.fullName}</strong>
                 <span>{adminUser.email}</span>
-                <small>{shortId(adminUser.id)}</small>
+                <small>{adminUser.phone}</small>
                 <div className="chip-row">
                   {adminUser.roles.map((role) => (
                     <span key={role} className="soft-chip">
-                      {role}
+                      {roleLabel(role)}
                     </span>
                   ))}
                 </div>
+                <small>Activa o retira accesos segun la labor de esta persona.</small>
                 <div className="role-actions">
                   {ROLE_OPTIONS.map((role) => (
                     <button
                       key={role}
                       type="button"
+                      className={adminUser.roles.includes(role) ? "is-selected" : ""}
                       onClick={() => void props.updateRoles(adminUser.id, toggleRoles(adminUser.roles, role))}
                     >
-                      {role}
+                      {roleLabel(role)}
                     </button>
                   ))}
                 </div>
               </article>
             ))
           ) : (
-            <EmptyState text="No hay usuarios cargados para administracion." />
+            <EmptyState text="Todavia no hay usuarios registrados." />
           )}
         </div>
       </Panel>
 
       <div className="split-panels">
-        <Panel eyebrow="Sedes" title="Alta de clinicas">
+        <Panel eyebrow="Clinicas" title="Sedes registradas">
           <InlineForm
-            title="Nueva sede"
+            title="Crear sede"
             fields={[
-              { name: "legalName", placeholder: "Razon social" },
-              { name: "taxId", placeholder: "NIT" },
-              { name: "address", placeholder: "Direccion" }
+              { name: "legalName", placeholder: "Nombre de la clinica" },
+              { name: "taxId", placeholder: "Identificacion tributaria" },
+              { name: "address", placeholder: "Ciudad o direccion" }
             ]}
-            submitLabel="Crear clinica"
+            submitLabel="Guardar sede"
             onSubmit={(data) => props.submitJson("/users/clinics", data)}
           />
 
@@ -671,21 +705,19 @@ export function AdminPortal(props: {
             {props.clinics.length ? (
               props.clinics.map((clinic) => (
                 <article key={clinic.id} className="entity-card">
-                  <span className="entity-kicker">Clinica</span>
+                  <span className="entity-kicker">Sede</span>
                   <strong>{clinic.legalName}</strong>
                   <span>{clinic.address}</span>
-                  <small>
-                    NIT {clinic.taxId} / Staff {clinic.staffCount ?? 0}
-                  </small>
+                  <small>{clinic.staffCount ?? 0} personas en el equipo</small>
                 </article>
               ))
             ) : (
-              <EmptyState text="No hay clinicas registradas todavia." />
+              <EmptyState text="Todavia no hay sedes registradas." />
             )}
           </div>
         </Panel>
 
-        <Panel eyebrow="Analitica" title="Pulso global">
+        <Panel eyebrow="Resumen" title="Vista general">
           {props.analytics?.global ? (
             <div className="kpi-stack">
               <article className="mini-kpi">
@@ -701,28 +733,28 @@ export function AdminPortal(props: {
                 <strong>{props.analytics.global.totalAppointments}</strong>
               </article>
               <article className="mini-kpi">
-                <span>Revenue</span>
+                <span>Ingresos</span>
                 <strong>${Math.round(props.analytics.global.revenue).toLocaleString("es-CO")}</strong>
               </article>
             </div>
           ) : (
-            <EmptyState text="La analitica global aparecera despues de procesar eventos." />
+            <EmptyState text="La vista general aparecera cuando haya movimiento en la plataforma." />
           )}
 
           <div className="feed-group">
-            <h3>Resumen por clinica</h3>
+            <h3>Por clinica</h3>
             {props.analytics?.clinics.length ? (
               props.analytics.clinics.map((clinic) => (
                 <article key={`${clinic.clinicId}-${clinic.date}`} className="feed-card">
                   <div>
-                    <strong>{shortId(clinic.clinicId)}</strong>
-                    <span>{clinic.appointments} citas / ocupacion {clinic.occupancy}%</span>
+                    <strong>{clinic.appointments} citas</strong>
+                    <span>Ocupacion del dia: {clinic.occupancy}%</span>
                   </div>
                   <small>${Math.round(clinic.revenue).toLocaleString("es-CO")}</small>
                 </article>
               ))
             ) : (
-              <EmptyState text="No hay KPIs por clinica disponibles." />
+              <EmptyState text="Todavia no hay datos suficientes para este resumen." />
             )}
           </div>
         </Panel>
@@ -741,30 +773,34 @@ export function ActivityRail(props: {
   const lowerStatus = props.status.toLowerCase();
   const state = props.loading
     ? "syncing"
-    : lowerStatus.includes("no fue") || lowerStatus.includes("no tienes") || lowerStatus.includes("falta sincronizar")
+    : lowerStatus.includes("no fue") || lowerStatus.includes("no puedes") || lowerStatus.includes("actualizando")
       ? "attention"
       : "online";
 
   return (
     <div className="rail-stack">
-      <Panel eyebrow="Estado" title="Centro de control">
+      <Panel eyebrow="Hoy" title="Como va tu dia">
         <div className={`signal-banner signal-${state}`}>
           <span className="signal-chip">
-            {state === "syncing" ? "Sincronizando" : state === "attention" ? "Revisar" : "En linea"}
+            {state === "syncing" ? "Actualizando" : state === "attention" ? "Atencion" : "Al dia"}
           </span>
           <strong>{props.status}</strong>
-          <p>Si un modulo no responde en despliegue, revisa la URL publica del backend y la configuracion de CORS.</p>
+          <p>
+            {state === "attention"
+              ? "Algunas secciones pueden tardar un poco mas de lo normal."
+              : "Tu informacion principal esta lista para continuar."}
+          </p>
         </div>
       </Panel>
 
-      <Panel eyebrow="Radar" title="Linea de actividad">
+      <Panel eyebrow="Novedades" title="Actividad reciente">
         <div className="feed-group">
           {props.notifications.length ? (
             props.notifications.slice(0, 6).map((notification) => (
               <article key={notification.id} className="timeline-card">
                 <span className="timeline-dot" />
                 <div className="timeline-copy">
-                  <small className="timeline-tag">{notification.category}</small>
+                  <small className="timeline-tag">{notificationCategoryLabel(notification.category)}</small>
                   <strong>{notification.title}</strong>
                   <span>{notification.message}</span>
                 </div>
@@ -772,20 +808,20 @@ export function ActivityRail(props: {
               </article>
             ))
           ) : (
-            <EmptyState text="No hay actividad reciente que mostrar." />
+            <EmptyState text="Todavia no hay novedades para mostrar." />
           )}
         </div>
       </Panel>
 
-      <Panel eyebrow="Contexto" title="Foco operativo">
+      <Panel eyebrow="En foco" title="Lo importante ahora">
         <div className="context-grid">
           <article className="context-card">
-            <span>Portal actual</span>
+            <span>Seccion</span>
             <strong>{props.portalTitle}</strong>
           </article>
           <article className="context-card">
-            <span>Mascota o paciente</span>
-            <strong>{props.selectedPetName ?? "Sin seleccion"}</strong>
+            <span>En pantalla</span>
+            <strong>{props.selectedPetName ?? "Vista general"}</strong>
           </article>
         </div>
       </Panel>
