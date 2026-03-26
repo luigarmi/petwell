@@ -95,8 +95,26 @@ export default async function handler(req, res) {
     return;
   }
 
+  const payload = Buffer.from(await upstream.arrayBuffer());
+  const contentType = upstream.headers.get("content-type") ?? "";
+  const payloadText = contentType.includes("text") || contentType.includes("json") ? payload.toString("utf8") : "";
+
+  if (
+    !upstream.ok &&
+    contentType.includes("text/html") &&
+    (payloadText.includes("NOT_FOUND") || payloadText.toLowerCase().includes("page could not be found"))
+  ) {
+    res.statusCode = 502;
+    res.setHeader("content-type", "application/json");
+    res.end(
+      JSON.stringify({
+        error: "Gateway route not found. Verify PETWELL_GATEWAY_URL and the backend deployment."
+      })
+    );
+    return;
+  }
+
   setResponseHeaders(res, upstream);
   res.statusCode = upstream.status;
-  const payload = Buffer.from(await upstream.arrayBuffer());
   res.end(payload);
 }

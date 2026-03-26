@@ -36,6 +36,10 @@ function normalizeErrorMessage(message: string) {
     return "No fue posible conectar con el gateway publico. Verifica el despliegue del backend.";
   }
 
+  if (lower.includes("gateway route not found") || lower.includes("page could not be found") || lower.includes("not_found")) {
+    return "La URL publica del gateway no responde con la API esperada. Revisa PETWELL_GATEWAY_URL y el despliegue del backend.";
+  }
+
   if (lower.includes("invalid input syntax for type uuid")) {
     return "Uno de los datos enviados no tiene un identificador valido. Recarga el portal e intenta de nuevo.";
   }
