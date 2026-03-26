@@ -25,6 +25,7 @@
     "start:notification-service": "tsx apps/services/notification-service/src/index.ts",
     "start:analytics-service": "tsx apps/services/analytics-service/src/index.ts",
     "start:web": "vite --config apps/web/vite.config.ts --host 0.0.0.0 --port 3000",
+    "init:managed-db": "powershell -ExecutionPolicy Bypass -File .\\scripts\\init-managed-postgres.ps1",
     "typecheck": "tsc --noEmit",
     "build:web": "vite build --config apps/web/vite.config.ts",
     "smoke": "powershell -ExecutionPolicy Bypass -File .\\scripts\\smoke-test.ps1"

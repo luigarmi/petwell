@@ -13,6 +13,7 @@ import {
   one,
   requireAuth,
   requireEnv,
+  requireServiceDbUrl,
   requireRoles,
   roles,
   runStatements,
@@ -73,7 +74,7 @@ const staffSchema = z.object({
 
 const port = getNumberEnv("USER_SERVICE_PORT", 8081);
 const app = createBaseApp("user-service");
-const pool = createPool(requireEnv("USER_DB_URL"));
+const pool = createPool(requireServiceDbUrl("USER"), "user-service");
 
 const jwtPrivateKey = requireEnv("JWT_PRIVATE_KEY");
 const jwtIssuer = requireEnv("JWT_ISSUER");

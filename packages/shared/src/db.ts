@@ -1,8 +1,33 @@
-import { Pool, type QueryResultRow } from "pg";
+import { Pool, type PoolConfig, type QueryResultRow } from "pg";
+import { getEnv } from "./env.js";
 
-export function createPool(connectionString: string): Pool {
+function resolveSslConfig(connectionString: string): PoolConfig["ssl"] {
+  const sslModeFromEnv = getEnv("POSTGRES_SSL_MODE", "").trim().toLowerCase();
+  const rejectUnauthorized =
+    getEnv("POSTGRES_SSL_REJECT_UNAUTHORIZED", sslModeFromEnv.startsWith("verify") ? "true" : "false") ===
+    "true";
+
+  try {
+    const url = new URL(connectionString);
+    const sslModeFromUrl = url.searchParams.get("sslmode")?.trim().toLowerCase() ?? "";
+    const sslMode = sslModeFromUrl || sslModeFromEnv;
+    const shouldUseSsl = ["require", "verify-ca", "verify-full"].includes(sslMode);
+
+    if (!shouldUseSsl) {
+      return undefined;
+    }
+
+    return { rejectUnauthorized };
+  } catch {
+    return sslModeFromEnv ? { rejectUnauthorized } : undefined;
+  }
+}
+
+export function createPool(connectionString: string, applicationName?: string): Pool {
   return new Pool({
-    connectionString
+    connectionString,
+    ssl: resolveSslConfig(connectionString),
+    application_name: applicationName
   });
 }
 

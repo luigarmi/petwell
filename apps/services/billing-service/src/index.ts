@@ -12,6 +12,7 @@ import {
   RedisBus,
   requireAuth,
   requireEnv,
+  requireServiceDbUrl,
   runStatements,
   type Role
 } from "../../../../packages/shared/src/index.js";
@@ -63,7 +64,7 @@ const paymentSchema = z.object({
 
 const app = createBaseApp("billing-service");
 const port = getNumberEnv("BILLING_SERVICE_PORT", 8085);
-const pool = createPool(requireEnv("BILLING_DB_URL"));
+const pool = createPool(requireServiceDbUrl("BILLING"), "billing-service");
 const bus = new RedisBus(requireEnv("REDIS_URL"));
 const appointmentServiceUrl = requireEnv("APPOINTMENT_SERVICE_URL");
 const userServiceUrl = requireEnv("USER_SERVICE_URL");

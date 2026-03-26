@@ -68,6 +68,9 @@ Parte de `.env.example` y ajusta segun el entorno:
 
 - `POSTGRES_USER`
 - `POSTGRES_PASSWORD`
+- `PETWELL_POSTGRES_BASE_URL`
+- `POSTGRES_SSL_MODE`
+- `POSTGRES_SSL_REJECT_UNAUTHORIZED`
 - `JWT_PRIVATE_KEY`
 - `JWT_PUBLIC_KEY`
 - `JWT_ISSUER`
@@ -118,10 +121,42 @@ Si prefieres que el navegador llame directo al gateway, configura:
 - `PETWELL_API_BASE=https://tu-gateway-publico`
 - `CORS_ALLOWED_ORIGINS=https://tu-frontend.vercel.app`
 
+### Backend con Neon Postgres
+
+La opcion recomendada para despliegue real es mantener PostgreSQL y usar una instancia gestionada como Neon.
+
+El backend ya soporta dos modos:
+
+- definir `USER_DB_URL`, `PET_DB_URL`, `EHR_DB_URL`, `APPOINTMENT_DB_URL`, `BILLING_DB_URL`, `TELEMED_DB_URL`, `NOTIFICATION_DB_URL` y `ANALYTICS_DB_URL`
+- o definir una sola `PETWELL_POSTGRES_BASE_URL`, desde la cual el sistema deriva automaticamente estas bases:
+  - `petwell_user`
+  - `petwell_pet`
+  - `petwell_ehr`
+  - `petwell_appointment`
+  - `petwell_billing`
+  - `petwell_telemed`
+  - `petwell_notification`
+  - `petwell_analytics`
+
+Para Neon normalmente debes usar:
+
+- `PETWELL_POSTGRES_BASE_URL=postgres://.../postgres?sslmode=require`
+- `POSTGRES_SSL_MODE=require`
+- `POSTGRES_SSL_REJECT_UNAUTHORIZED=false`
+
+Antes del primer arranque, crea las bases con:
+
+```powershell
+npm run init:managed-db
+```
+
+Ese comando usa `PETWELL_POSTGRES_BASE_URL` y crea todas las bases requeridas en el Postgres gestionado.
+
 ## Scripts utiles
 
 ```powershell
 npm install
+npm run init:managed-db
 npm run typecheck
 npm run build:web
 npm run smoke

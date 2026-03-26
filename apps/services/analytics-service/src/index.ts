@@ -10,6 +10,7 @@ import {
   RedisBus,
   requireAuth,
   requireEnv,
+  requireServiceDbUrl,
   runStatements,
   type DomainEvent,
   type Role
@@ -23,7 +24,7 @@ type UserContext = {
 
 const app = createBaseApp("analytics-service");
 const port = getNumberEnv("ANALYTICS_SERVICE_PORT", 8088);
-const pool = createPool(requireEnv("ANALYTICS_DB_URL"));
+const pool = createPool(requireServiceDbUrl("ANALYTICS"), "analytics-service");
 const bus = new RedisBus(requireEnv("REDIS_URL"));
 const userServiceUrl = requireEnv("USER_SERVICE_URL");
 

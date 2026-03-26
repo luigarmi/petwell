@@ -11,6 +11,7 @@ import {
   RedisBus,
   requireAuth,
   requireEnv,
+  requireServiceDbUrl,
   runStatements,
   type Role
 } from "../../../../packages/shared/src/index.js";
@@ -44,7 +45,7 @@ const manualNotificationSchema = z.object({
 
 const app = createBaseApp("notification-service");
 const port = getNumberEnv("NOTIFICATION_SERVICE_PORT", 8087);
-const pool = createPool(requireEnv("NOTIFICATION_DB_URL"));
+const pool = createPool(requireServiceDbUrl("NOTIFICATION"), "notification-service");
 const bus = new RedisBus(requireEnv("REDIS_URL"));
 const userServiceUrl = requireEnv("USER_SERVICE_URL");
 

@@ -12,6 +12,7 @@ import {
   RedisBus,
   requireAuth,
   requireEnv,
+  requireServiceDbUrl,
   requireRoles,
   runStatements,
   type Role
@@ -46,7 +47,7 @@ const petSchema = z.object({
 
 const app = createBaseApp("pet-service");
 const port = getNumberEnv("PET_SERVICE_PORT", 8082);
-const pool = createPool(requireEnv("PET_DB_URL"));
+const pool = createPool(requireServiceDbUrl("PET"), "pet-service");
 const userServiceUrl = requireEnv("USER_SERVICE_URL");
 const bus = new RedisBus(requireEnv("REDIS_URL"));
 

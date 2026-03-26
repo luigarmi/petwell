@@ -14,6 +14,7 @@ import {
   RedisBus,
   requireAuth,
   requireEnv,
+  requireServiceDbUrl,
   runStatements,
   type AppointmentStatus,
   type AppointmentType,
@@ -57,7 +58,7 @@ type AppointmentRow = {
 
 const app = createBaseApp("appointment-service");
 const port = getNumberEnv("APPOINTMENT_SERVICE_PORT", 8084);
-const pool = createPool(requireEnv("APPOINTMENT_DB_URL"));
+const pool = createPool(requireServiceDbUrl("APPOINTMENT"), "appointment-service");
 const bus = new RedisBus(requireEnv("REDIS_URL"));
 const userServiceUrl = requireEnv("USER_SERVICE_URL");
 const petServiceUrl = requireEnv("PET_SERVICE_URL");

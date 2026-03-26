@@ -14,6 +14,7 @@ import {
   RedisBus,
   requireAuth,
   requireEnv,
+  requireServiceDbUrl,
   requireRoles,
   runStatements,
   sha256,
@@ -98,7 +99,7 @@ const prescriptionSchema = z.object({
 
 const app = createBaseApp("ehr-service");
 const port = getNumberEnv("EHR_SERVICE_PORT", 8083);
-const pool = createPool(requireEnv("EHR_DB_URL"));
+const pool = createPool(requireServiceDbUrl("EHR"), "ehr-service");
 const bus = new RedisBus(requireEnv("REDIS_URL"));
 const encryptionKey = requireEnv("EHR_ENCRYPTION_KEY");
 const petServiceUrl = requireEnv("PET_SERVICE_URL");
