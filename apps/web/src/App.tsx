@@ -1,134 +1,37 @@
 import { FormEvent, useEffect, useState } from "react";
-import { api, API_BASE, dayName, formatDate } from "./api.js";
-import { InlineForm, Panel } from "./components.js";
+import { API_BASE, api } from "./api.js";
+import { ActivityRail, AdminPortal, ClinicPortal, OwnerPortal } from "./portal-sections.js";
+import {
+  getAvailablePortals,
+  getDefaultPortal,
+  portalDescription,
+  portalTitle,
+  settledValue,
+  type AdminUser,
+  type AnalyticsSummary,
+  type Appointment,
+  type Clinic,
+  type InvoiceItem,
+  type Notification,
+  type Pet,
+  type Portal,
+  type Schedule,
+  type SessionUser,
+  type SimpleItem,
+  type TelemedRoom,
+  type Role
+} from "./dashboard-models.js";
+import { buildMetrics } from "./dashboard-shared.js";
 
-type Role = "OWNER" | "CLINIC_ADMIN" | "VET" | "RECEPTIONIST" | "ADMIN";
-
-type SessionUser = {
-  id: string;
-  email: string;
-  roles: Role[];
-  clinicIds?: string[];
-  fullName?: string;
-};
-
-type Pet = {
-  id: string;
-  name: string;
-  species: string;
-  breed: string;
-  primaryClinicId: string;
-  ownerIds: string[];
-};
-
-type Clinic = {
-  id: string;
-  legalName: string;
-  taxId: string;
-  address: string;
-  staffCount?: number;
-};
-
-type Schedule = {
-  id: string;
-  clinicId: string;
-  vetUserId: string;
-  dayOfWeek: number;
-  start: string;
-  end: string;
-  slotMinutes: number;
-};
-
-type Appointment = {
-  id: string;
-  petId: string;
-  ownerUserId: string;
-  clinicId: string;
-  vetUserId: string;
-  type: string;
-  startTime: string;
-  endTime: string;
-  status: string;
-};
-
-type Notification = {
-  id: string;
-  category: string;
-  title: string;
-  message: string;
-  createdAt: string;
-};
-
-type InvoiceItem = {
-  appointmentId: string;
-  invoice: {
-    id: string;
-    total: number;
-    status: string;
-    issuedAt: string;
-  };
-  payment: {
-    id: string;
-    amount: number;
-    provider: string;
-    status: string;
-  } | null;
-};
-
-type TelemedRoom = {
-  appointmentId: string;
-  roomUrl: string;
-  roomCode: string;
-  createdAt: string;
-};
-
-type AdminUser = {
-  id: string;
-  email: string;
-  phone: string;
-  fullName: string;
-  status: string;
-  roles: Role[];
-};
-
-type SimpleItem = {
-  id: string;
-  reason?: string;
-  notes?: string;
-  vaccineCode?: string;
-  date?: string;
-  drug?: string;
-  dose?: string;
-};
-
-type AnalyticsSummary = {
-  global: {
-    date: string;
-    activeClinics: number;
-    registeredPets: number;
-    totalAppointments: number;
-    telemedCount: number;
-    revenue: number;
-  } | null;
-  clinics: Array<{
-    date: string;
-    clinicId: string;
-    occupancy: number;
-    revenue: number;
-    appointments: number;
-  }>;
-};
-
-function hasRole(user: SessionUser | null, role: Role) {
-  return Boolean(user?.roles.includes(role));
+function readStoredUser() {
+  const raw = localStorage.getItem("petwell_user");
+  return raw ? (JSON.parse(raw) as SessionUser) : null;
 }
 
 export function App() {
   const [token, setToken] = useState<string | null>(() => localStorage.getItem("petwell_token"));
-  const [user, setUser] = useState<SessionUser | null>(() => {
-    const raw = localStorage.getItem("petwell_user");
-    return raw ? (JSON.parse(raw) as SessionUser) : null;
-  });
+  const [user, setUser] = useState<SessionUser | null>(() => readStoredUser());
+  const [activePortal, setActivePortal] = useState<Portal | null>(() => getDefaultPortal(readStoredUser()));
   const [status, setStatus] = useState("Conecta la plataforma y entra con tu rol.");
   const [loading, setLoading] = useState(false);
   const [authMode, setAuthMode] = useState<"login" | "register">("login");
@@ -146,11 +49,26 @@ export function App() {
   const [vaccinations, setVaccinations] = useState<SimpleItem[]>([]);
   const [prescriptions, setPrescriptions] = useState<SimpleItem[]>([]);
 
+  const availablePortals = getAvailablePortals(user);
+  const currentPortal = activePortal && availablePortals.includes(activePortal) ? activePortal : getDefaultPortal(user);
+  const selectedPet = pets.find((pet) => pet.id === selectedPetId) ?? null;
+  const metrics = buildMetrics(currentPortal, {
+    pets,
+    clinics,
+    appointments,
+    notifications,
+    invoices,
+    telemedRooms,
+    adminUsers,
+    analytics
+  });
+
   async function persistAndLoad(nextToken: string, nextUser: SessionUser) {
     localStorage.setItem("petwell_token", nextToken);
     localStorage.setItem("petwell_user", JSON.stringify(nextUser));
     setToken(nextToken);
     setUser(nextUser);
+    setActivePortal(getDefaultPortal(nextUser));
     await loadDashboard(nextToken);
   }
 
@@ -164,57 +82,67 @@ export function App() {
       const me = await api<{ user: SessionUser }>("/users/me", currentToken);
       setUser(me.user);
 
-      const tasks: Array<Promise<unknown>> = [
-        api<{ clinics: Clinic[] }>("/users/clinics", currentToken).then((response) => setClinics(response.clinics)),
-        api<{ schedules: Schedule[] }>("/appointments/schedules", currentToken).then((response) =>
-          setSchedules(response.schedules)
-        ),
-        api<{ appointments: Appointment[] }>("/appointments", currentToken).then((response) =>
-          setAppointments(response.appointments)
-        ),
-        api<{ notifications: Notification[] }>("/notifications", currentToken).then((response) =>
-          setNotifications(response.notifications)
-        ),
-        api<{ pets: Pet[] }>("/pets", currentToken).then((response) => {
-          setPets(response.pets);
-          if (!selectedPetId && response.pets[0]) {
-            setSelectedPetId(response.pets[0].id);
-          }
-        }),
-        api<{ invoices: InvoiceItem[] }>("/payments/invoices", currentToken).then((response) =>
-          setInvoices(response.invoices)
-        )
-      ];
-
-      if (me.user.roles.includes("OWNER") || me.user.roles.includes("ADMIN")) {
-        tasks.push(
-          api<{ rooms: TelemedRoom[] }>("/telemed/rooms", currentToken).then((response) =>
-            setTelemedRooms(response.rooms)
-          )
-        );
-      } else {
-        setTelemedRooms([]);
-      }
-
-      if (
+      const canSeeTelemed = me.user.roles.includes("OWNER") || me.user.roles.includes("ADMIN");
+      const canSeeAnalytics =
         me.user.roles.includes("ADMIN") ||
         me.user.roles.includes("CLINIC_ADMIN") ||
         me.user.roles.includes("VET") ||
-        me.user.roles.includes("RECEPTIONIST")
-      ) {
-        tasks.push(api<AnalyticsSummary>("/analytics/summary", currentToken).then(setAnalytics));
-      } else {
-        setAnalytics(null);
-      }
+        me.user.roles.includes("RECEPTIONIST");
+      const canSeeUsers = me.user.roles.includes("ADMIN");
 
-      if (me.user.roles.includes("ADMIN")) {
-        tasks.push(api<{ users: AdminUser[] }>("/users/admin/users", currentToken).then((response) => setAdminUsers(response.users)));
-      } else {
-        setAdminUsers([]);
-      }
+      const [
+        clinicsResult,
+        schedulesResult,
+        appointmentsResult,
+        notificationsResult,
+        petsResult,
+        invoicesResult,
+        telemedResult,
+        analyticsResult,
+        usersResult
+      ] = await Promise.allSettled([
+        api<{ clinics: Clinic[] }>("/users/clinics", currentToken),
+        api<{ schedules: Schedule[] }>("/appointments/schedules", currentToken),
+        api<{ appointments: Appointment[] }>("/appointments", currentToken),
+        api<{ notifications: Notification[] }>("/notifications", currentToken),
+        api<{ pets: Pet[] }>("/pets", currentToken),
+        api<{ invoices: InvoiceItem[] }>("/payments/invoices", currentToken),
+        canSeeTelemed ? api<{ rooms: TelemedRoom[] }>("/telemed/rooms", currentToken) : Promise.resolve({ rooms: [] }),
+        canSeeAnalytics ? api<AnalyticsSummary>("/analytics/summary", currentToken) : Promise.resolve(null),
+        canSeeUsers ? api<{ users: AdminUser[] }>("/users/admin/users", currentToken) : Promise.resolve({ users: [] })
+      ]);
 
-      await Promise.all(tasks);
-      setStatus("Datos sincronizados.");
+      setClinics(settledValue(clinicsResult, { clinics: [] }).clinics);
+      setSchedules(settledValue(schedulesResult, { schedules: [] }).schedules);
+      setAppointments(settledValue(appointmentsResult, { appointments: [] }).appointments);
+      setNotifications(settledValue(notificationsResult, { notifications: [] }).notifications);
+      setInvoices(settledValue(invoicesResult, { invoices: [] }).invoices);
+      setTelemedRooms(settledValue(telemedResult, { rooms: [] }).rooms);
+      setAnalytics(canSeeAnalytics ? settledValue(analyticsResult, null) : null);
+      setAdminUsers(settledValue(usersResult, { users: [] }).users);
+
+      const nextPets = settledValue(petsResult, { pets: [] }).pets;
+      setPets(nextPets);
+      setSelectedPetId((current) => {
+        if (nextPets.some((pet) => pet.id === current)) {
+          return current;
+        }
+        return nextPets[0]?.id ?? "";
+      });
+
+      const failures = [
+        clinicsResult,
+        schedulesResult,
+        appointmentsResult,
+        notificationsResult,
+        petsResult,
+        invoicesResult,
+        telemedResult,
+        analyticsResult,
+        usersResult
+      ].filter((result) => result.status === "rejected").length;
+
+      setStatus(failures ? `Datos sincronizados con ${failures} modulo(s) pendientes.` : "Datos sincronizados.");
     } catch (error) {
       setStatus(error instanceof Error ? error.message : "No fue posible sincronizar.");
     } finally {
@@ -224,24 +152,21 @@ export function App() {
 
   async function loadClinicalData(petId: string, currentToken = token) {
     if (!currentToken || !petId) {
-      return;
-    }
-
-    try {
-      const [recordsResponse, vaccinationsResponse, prescriptionsResponse] = await Promise.all([
-        api<{ records: SimpleItem[] }>(`/ehr/pets/${petId}/records`, currentToken),
-        api<{ vaccinations: SimpleItem[] }>(`/ehr/pets/${petId}/vaccinations`, currentToken),
-        api<{ prescriptions: SimpleItem[] }>(`/ehr/pets/${petId}/prescriptions`, currentToken)
-      ]);
-
-      setRecords(recordsResponse.records);
-      setVaccinations(vaccinationsResponse.vaccinations);
-      setPrescriptions(prescriptionsResponse.prescriptions);
-    } catch {
       setRecords([]);
       setVaccinations([]);
       setPrescriptions([]);
+      return;
     }
+
+    const [recordsResult, vaccinationsResult, prescriptionsResult] = await Promise.allSettled([
+      api<{ records: SimpleItem[] }>(`/ehr/pets/${petId}/records`, currentToken),
+      api<{ vaccinations: SimpleItem[] }>(`/ehr/pets/${petId}/vaccinations`, currentToken),
+      api<{ prescriptions: SimpleItem[] }>(`/ehr/pets/${petId}/prescriptions`, currentToken)
+    ]);
+
+    setRecords(settledValue(recordsResult, { records: [] }).records);
+    setVaccinations(settledValue(vaccinationsResult, { vaccinations: [] }).vaccinations);
+    setPrescriptions(settledValue(prescriptionsResult, { prescriptions: [] }).prescriptions);
   }
 
   useEffect(() => {
@@ -251,17 +176,36 @@ export function App() {
   }, [token]);
 
   useEffect(() => {
-    if (token && selectedPetId) {
-      void loadClinicalData(selectedPetId, token);
+    const nextDefault = getDefaultPortal(user);
+    if (!currentPortal && nextDefault) {
+      setActivePortal(nextDefault);
+      return;
     }
-  }, [selectedPetId, token]);
+    if (currentPortal && !availablePortals.includes(currentPortal)) {
+      setActivePortal(nextDefault);
+    }
+  }, [availablePortals, currentPortal, user]);
+
+  useEffect(() => {
+    if (token && selectedPetId && currentPortal !== "admin") {
+      void loadClinicalData(selectedPetId, token);
+      return;
+    }
+
+    if (!selectedPetId || currentPortal === "admin") {
+      setRecords([]);
+      setVaccinations([]);
+      setPrescriptions([]);
+    }
+  }, [currentPortal, selectedPetId, token]);
 
   function logout() {
     localStorage.removeItem("petwell_token");
     localStorage.removeItem("petwell_user");
     setToken(null);
     setUser(null);
-    setStatus("Sesión cerrada.");
+    setActivePortal(null);
+    setStatus("Sesion cerrada.");
   }
 
   async function submitJson(path: string, body: Record<string, unknown>, method = "POST") {
@@ -274,13 +218,13 @@ export function App() {
         method,
         body: JSON.stringify(body)
       });
-      setStatus("Operación completada.");
+      setStatus("Operacion completada.");
       await loadDashboard(token);
-      if (selectedPetId) {
+      if (selectedPetId && currentPortal !== "admin") {
         await loadClinicalData(selectedPetId, token);
       }
     } catch (error) {
-      setStatus(error instanceof Error ? error.message : "La operación falló.");
+      setStatus(error instanceof Error ? error.message : "La operacion fallo.");
     }
   }
 
@@ -309,7 +253,7 @@ export function App() {
           body: JSON.stringify({ email, password })
         });
         await persistAndLoad(response.token, response.user);
-        setStatus("Sesión iniciada.");
+        setStatus("Sesion iniciada.");
       }
 
       event.currentTarget.reset();
@@ -330,40 +274,50 @@ export function App() {
     });
   }
 
-  if (!token || !user) {
+  if (!token || !user || !currentPortal) {
     return (
-      <main className="shell landing-shell">
-        <section className="hero-panel">
-          <div className="hero-copy">
-            <span className="eyebrow">PetWell Ecosystem</span>
-            <h1>Salud veterinaria, operación clínica y administración en una sola superficie.</h1>
-            <p>
-              El portal centraliza mascotas, EHR, agenda, pagos, telemedicina, notificaciones y trazabilidad
-              por rol sin exponer ruido técnico al usuario final.
-            </p>
-            <div className="hero-grid">
-              <article>
-                <strong>Propietario</strong>
-                <span>Agenda y sigue cada consulta desde el registro hasta la factura.</span>
-              </article>
-              <article>
-                <strong>Clínica</strong>
-                <span>Orquesta staff, disponibilidad, atención y comunicación operativa.</span>
-              </article>
-              <article>
-                <strong>Admin</strong>
-                <span>Asigna roles, controla sedes y revisa métricas globales del ecosistema.</span>
-              </article>
-            </div>
+      <main className="app-shell landing-shell">
+        <section className="landing-hero">
+          <div className="brand-lockup">
+            <span className="brand-badge">PetWell</span>
+            <span className="hero-note">Veterinaria digital para propietarios, sedes y administracion</span>
+          </div>
+          <h1>Una experiencia clara para cuidar mascotas sin mezclar operacion, clinica y gobierno.</h1>
+          <p>
+            La plataforma centraliza agenda, EHR, pagos, telemedicina y analitica. Cada rol entra a su propio
+            portal para evitar ruido visual y errores de operacion.
+          </p>
+
+          <div className="hero-highlights">
+            <article>
+              <strong>Portal propietario</strong>
+              <span>Mascotas, consentimientos, citas, pagos y seguimiento.</span>
+            </article>
+            <article>
+              <strong>Portal clinico</strong>
+              <span>Agenda, pacientes, registros, staff y mensajeria operativa.</span>
+            </article>
+            <article>
+              <strong>Portal admin</strong>
+              <span>Usuarios, roles, sedes y supervision global del ecosistema.</span>
+            </article>
           </div>
         </section>
 
-        <section className="auth-panel">
-          <div className="auth-switch">
-            <button className={authMode === "login" ? "active" : ""} onClick={() => setAuthMode("login")}>
+        <section className="auth-card">
+          <div className="auth-toggle">
+            <button
+              type="button"
+              className={authMode === "login" ? "is-active" : ""}
+              onClick={() => setAuthMode("login")}
+            >
               Ingresar
             </button>
-            <button className={authMode === "register" ? "active" : ""} onClick={() => setAuthMode("register")}>
+            <button
+              type="button"
+              className={authMode === "register" ? "is-active" : ""}
+              onClick={() => setAuthMode("register")}
+            >
               Crear cuenta
             </button>
           </div>
@@ -371,474 +325,133 @@ export function App() {
           <form className="stack-form" onSubmit={handleAuth}>
             {authMode === "register" ? <input name="fullName" placeholder="Nombre completo" required /> : null}
             <input name="email" type="email" placeholder="Correo" required />
-            {authMode === "register" ? <input name="phone" placeholder="Teléfono" required /> : null}
-            <input name="password" type="password" placeholder="Contraseña" required />
+            {authMode === "register" ? <input name="phone" placeholder="Telefono" required /> : null}
+            <input name="password" type="password" placeholder="Contrasena" required />
             <button type="submit">{authMode === "register" ? "Crear cuenta OWNER" : "Entrar a PetWell"}</button>
           </form>
 
-          <div className="status-box">
-            <strong>Estado</strong>
-            <span>{status}</span>
+          <div className="status-card">
+            <span className="mini-label">Estado</span>
+            <strong>{status}</strong>
           </div>
 
-          <div className="support-drawer">
-            <details>
-              <summary>Panel técnico</summary>
-              <p>API base: {API_BASE}</p>
-              <p>Usa el administrador bootstrap desde `.env` para habilitar roles elevados.</p>
-            </details>
-          </div>
+          <details className="support-panel">
+            <summary>Panel tecnico</summary>
+            <p>Frontend desplegado contra: {API_BASE}</p>
+            <p>En produccion necesitas un backend publico, `PETWELL_API_BASE` y CORS configurado.</p>
+          </details>
         </section>
       </main>
     );
   }
 
   return (
-    <main className="shell dashboard-shell">
-      <header className="topbar">
+    <main className="app-shell workspace-shell">
+      <header className="workspace-topbar">
         <div>
-          <span className="eyebrow">Centro operativo PetWell</span>
+          <div className="brand-lockup compact">
+            <span className="brand-badge">PetWell</span>
+            <span className="hero-note">{portalTitle(currentPortal)}</span>
+          </div>
           <h1>{user.fullName ?? user.email}</h1>
-          <p>{user.email}</p>
+          <p>{portalDescription(currentPortal)}</p>
         </div>
+
         <div className="topbar-actions">
-          <div className="role-strip">
+          <div className="chip-row">
             {user.roles.map((role) => (
-              <span key={role} className="role-pill">
+              <span key={role} className="soft-chip">
                 {role}
               </span>
             ))}
           </div>
-          <button className="ghost-button" onClick={() => void loadDashboard(token)}>
-            {loading ? "Sincronizando..." : "Actualizar"}
-          </button>
-          <button className="ghost-button" onClick={logout}>
-            Cerrar sesión
-          </button>
+          <div className="action-row">
+            <button type="button" className="secondary-button" onClick={() => void loadDashboard(token)}>
+              {loading ? "Sincronizando..." : "Actualizar"}
+            </button>
+            <button type="button" className="secondary-button" onClick={logout}>
+              Cerrar sesion
+            </button>
+          </div>
         </div>
       </header>
 
-      <section className="overview-grid">
-        <article className="metric-card"><span>Mascotas</span><strong>{pets.length}</strong></article>
-        <article className="metric-card"><span>Citas</span><strong>{appointments.length}</strong></article>
-        <article className="metric-card"><span>Clínicas</span><strong>{clinics.length}</strong></article>
-        <article className="metric-card"><span>Notificaciones</span><strong>{notifications.length}</strong></article>
+      <section className="portal-switcher">
+        {availablePortals.map((portal) => (
+          <button
+            key={portal}
+            type="button"
+            className={portal === currentPortal ? "is-active" : ""}
+            onClick={() => setActivePortal(portal)}
+          >
+            <span>{portalTitle(portal)}</span>
+            <small>{portalDescription(portal)}</small>
+          </button>
+        ))}
+      </section>
+
+      <section className="metrics-row">
+        {metrics.map((metric) => (
+          <article key={metric.label} className="metric-tile">
+            <span>{metric.label}</span>
+            <strong>{metric.value}</strong>
+            <small>{metric.detail}</small>
+          </article>
+        ))}
       </section>
 
       <section className="workspace-grid">
-        {hasRole(user, "OWNER") ? (
-          <OwnerColumn
-            pets={pets}
-            clinics={clinics}
-            schedules={schedules}
-            appointments={appointments}
-            invoices={invoices}
-            telemedRooms={telemedRooms}
-            selectedPetId={selectedPetId}
-            setSelectedPetId={setSelectedPetId}
-            submitJson={submitJson}
-            payAppointment={payAppointment}
-          />
-        ) : null}
+        <div className="workspace-main">
+          {currentPortal === "owner" ? (
+            <OwnerPortal
+              clinics={clinics}
+              pets={pets}
+              schedules={schedules}
+              appointments={appointments}
+              invoices={invoices}
+              telemedRooms={telemedRooms}
+              selectedPetId={selectedPetId}
+              setSelectedPetId={setSelectedPetId}
+              records={records}
+              vaccinations={vaccinations}
+              prescriptions={prescriptions}
+              submitJson={submitJson}
+              payAppointment={payAppointment}
+            />
+          ) : null}
 
-        {hasRole(user, "CLINIC_ADMIN") || hasRole(user, "VET") || hasRole(user, "RECEPTIONIST") || hasRole(user, "ADMIN") ? (
-          <ClinicColumn
-            pets={pets}
-            clinics={clinics}
-            appointments={appointments}
-            analytics={analytics}
-            submitJson={submitJson}
-          />
-        ) : null}
+          {currentPortal === "clinic" ? (
+            <ClinicPortal
+              user={user}
+              clinics={clinics}
+              pets={pets}
+              appointments={appointments}
+              analytics={analytics}
+              notifications={notifications}
+              selectedPetId={selectedPetId}
+              setSelectedPetId={setSelectedPetId}
+              records={records}
+              vaccinations={vaccinations}
+              prescriptions={prescriptions}
+              submitJson={submitJson}
+            />
+          ) : null}
 
-        {hasRole(user, "ADMIN") ? (
-          <AdminColumn users={adminUsers} updateRoles={updateRoles} />
-        ) : null}
-      </section>
+          {currentPortal === "admin" ? (
+            <AdminPortal
+              clinics={clinics}
+              users={adminUsers}
+              analytics={analytics}
+              updateRoles={updateRoles}
+              submitJson={submitJson}
+            />
+          ) : null}
+        </div>
 
-      <section className="workspace-grid single">
-        <Panel title="Historial clínico visible">
-          <div className="list-grid three">
-            <article className="compact-card">
-              <strong>Records</strong>
-              {records.length ? records.map((item) => <span key={item.id}>{item.reason}: {item.notes}</span>) : <span>Sin datos</span>}
-            </article>
-            <article className="compact-card">
-              <strong>Vacunas</strong>
-              {vaccinations.length ? vaccinations.map((item) => <span key={item.id}>{item.vaccineCode} · {item.date}</span>) : <span>Sin datos</span>}
-            </article>
-            <article className="compact-card">
-              <strong>Prescripciones</strong>
-              {prescriptions.length ? prescriptions.map((item) => <span key={item.id}>{item.drug} · {item.dose}</span>) : <span>Sin datos</span>}
-            </article>
-          </div>
-        </Panel>
-
-        <Panel title="Pulso del sistema">
-          <div className="list-grid">
-            {notifications.slice(0, 6).map((notification) => (
-              <article key={notification.id} className="compact-card">
-                <strong>{notification.title}</strong>
-                <span>{notification.message}</span>
-                <small>{formatDate(notification.createdAt)}</small>
-              </article>
-            ))}
-          </div>
-          <div className="status-box">
-            <strong>Estado operativo</strong>
-            <span>{status}</span>
-          </div>
-        </Panel>
+        <aside className="workspace-rail">
+          <ActivityRail status={status} notifications={notifications} selectedPetName={selectedPet?.name} />
+        </aside>
       </section>
     </main>
-  );
-}
-
-function OwnerColumn(props: {
-  pets: Pet[];
-  clinics: Clinic[];
-  schedules: Schedule[];
-  appointments: Appointment[];
-  invoices: InvoiceItem[];
-  telemedRooms: TelemedRoom[];
-  selectedPetId: string;
-  setSelectedPetId: (value: string) => void;
-  submitJson: (path: string, body: Record<string, unknown>, method?: string) => Promise<void>;
-  payAppointment: (appointmentId: string) => Promise<void>;
-}) {
-  return (
-    <section className="workspace-column">
-      <Panel title="Mascotas y consentimientos">
-        <InlineForm
-          title="Registrar mascota"
-          fields={[
-            { name: "name", placeholder: "Nombre" },
-            { name: "species", placeholder: "Especie" },
-            { name: "breed", placeholder: "Raza" }
-          ]}
-          extraField={
-            <select name="primaryClinicId" required>
-              <option value="">Clínica principal</option>
-              {props.clinics.map((clinic) => (
-                <option key={clinic.id} value={clinic.id}>{clinic.legalName}</option>
-              ))}
-            </select>
-          }
-          onSubmit={(data) => props.submitJson("/pets", data)}
-        />
-
-        <InlineForm
-          title="Consentimiento EHR"
-          fields={[{ name: "scope", placeholder: "Alcance" }]}
-          extraField={
-            <>
-              <select name="petId" required>
-                <option value="">Mascota</option>
-                {props.pets.map((pet) => <option key={pet.id} value={pet.id}>{pet.name}</option>)}
-              </select>
-              <select name="clinicId" required>
-                <option value="">Clínica</option>
-                {props.clinics.map((clinic) => <option key={clinic.id} value={clinic.id}>{clinic.legalName}</option>)}
-              </select>
-            </>
-          }
-          onSubmit={(data) => props.submitJson("/ehr/consents", data)}
-        />
-
-        <div className="list-grid">
-          {props.pets.map((pet) => (
-            <button key={pet.id} className={`pet-card ${props.selectedPetId === pet.id ? "selected" : ""}`} onClick={() => props.setSelectedPetId(pet.id)}>
-              <strong>{pet.name}</strong>
-              <span>{pet.species} · {pet.breed}</span>
-              <small>{pet.id}</small>
-            </button>
-          ))}
-        </div>
-      </Panel>
-
-      <Panel title="Agenda, pagos y telemedicina">
-        <InlineForm
-          title="Reservar cita"
-          fields={[
-            { name: "startTime", type: "datetime-local", placeholder: "Inicio" },
-            { name: "endTime", type: "datetime-local", placeholder: "Fin" }
-          ]}
-          extraField={
-            <>
-              <select name="petId" required>
-                <option value="">Mascota</option>
-                {props.pets.map((pet) => <option key={pet.id} value={pet.id}>{pet.name}</option>)}
-              </select>
-              <select name="clinicId" required>
-                <option value="">Clínica</option>
-                {props.clinics.map((clinic) => <option key={clinic.id} value={clinic.id}>{clinic.legalName}</option>)}
-              </select>
-              <select name="vetUserId" required>
-                <option value="">Veterinario</option>
-                {props.schedules.map((schedule) => (
-                  <option key={schedule.id} value={schedule.vetUserId}>
-                    {schedule.vetUserId} · {dayName(schedule.dayOfWeek)} {schedule.start}-{schedule.end}
-                  </option>
-                ))}
-              </select>
-              <select name="type" required>
-                <option value="IN_PERSON">Presencial</option>
-                <option value="TELEMED">Telemedicina</option>
-              </select>
-            </>
-          }
-          onSubmit={(data) =>
-            props.submitJson("/appointments", {
-              ...data,
-              startTime: new Date(String(data.startTime)).toISOString(),
-              endTime: new Date(String(data.endTime)).toISOString()
-            })
-          }
-        />
-
-        <div className="list-grid">
-          {props.appointments.map((appointment) => (
-            <article key={appointment.id} className="compact-card">
-              <strong>{appointment.type}</strong>
-              <span>{formatDate(appointment.startTime)}</span>
-              <small>{appointment.status}</small>
-              {appointment.status === "PENDING_PAYMENT" ? (
-                <button onClick={() => void props.payAppointment(appointment.id)}>Pagar 95.000</button>
-              ) : null}
-            </article>
-          ))}
-        </div>
-
-        <div className="list-grid">
-          {props.invoices.map((item) => (
-            <article key={item.invoice.id} className="compact-card">
-              <strong>Factura {item.invoice.id.slice(0, 8)}</strong>
-              <span>{item.invoice.status}</span>
-              <small>${item.invoice.total.toLocaleString("es-CO")}</small>
-            </article>
-          ))}
-        </div>
-
-        <div className="list-grid">
-          {props.telemedRooms.map((room) => (
-            <article key={room.appointmentId} className="compact-card">
-              <strong>{room.roomCode}</strong>
-              <span>{room.roomUrl}</span>
-            </article>
-          ))}
-        </div>
-      </Panel>
-    </section>
-  );
-}
-
-function ClinicColumn(props: {
-  pets: Pet[];
-  clinics: Clinic[];
-  appointments: Appointment[];
-  analytics: AnalyticsSummary | null;
-  submitJson: (path: string, body: Record<string, unknown>, method?: string) => Promise<void>;
-}) {
-  return (
-    <section className="workspace-column">
-      <Panel title="Operación clínica">
-        <InlineForm
-          title="Crear clínica"
-          fields={[
-            { name: "legalName", placeholder: "Razón social" },
-            { name: "taxId", placeholder: "NIT" },
-            { name: "address", placeholder: "Dirección" }
-          ]}
-          onSubmit={(data) => props.submitJson("/users/clinics", data)}
-        />
-
-        <InlineForm
-          title="Vincular staff"
-          fields={[{ name: "userId", placeholder: "ID del usuario" }]}
-          extraField={
-            <>
-              <select name="clinicId" required>
-                <option value="">Clínica</option>
-                {props.clinics.map((clinic) => <option key={clinic.id} value={clinic.id}>{clinic.legalName}</option>)}
-              </select>
-              <select name="staffRole" required>
-                <option value="CLINIC_ADMIN">CLINIC_ADMIN</option>
-                <option value="VET">VET</option>
-                <option value="RECEPTIONIST">RECEPTIONIST</option>
-              </select>
-            </>
-          }
-          onSubmit={(data) =>
-            props.submitJson(`/users/clinics/${String(data.clinicId)}/staff`, {
-              userId: data.userId,
-              staffRole: data.staffRole
-            })
-          }
-        />
-
-        <InlineForm
-          title="Crear horario"
-          fields={[
-            { name: "vetUserId", placeholder: "ID del veterinario" },
-            { name: "dayOfWeek", type: "number", placeholder: "0-6" },
-            { name: "start", type: "time", placeholder: "Inicio" },
-            { name: "end", type: "time", placeholder: "Fin" },
-            { name: "slotMinutes", type: "number", placeholder: "Minutos por slot" }
-          ]}
-          extraField={
-            <select name="clinicId" required>
-              <option value="">Clínica</option>
-              {props.clinics.map((clinic) => <option key={clinic.id} value={clinic.id}>{clinic.legalName}</option>)}
-            </select>
-          }
-          onSubmit={(data) => props.submitJson("/appointments/schedules", data)}
-        />
-      </Panel>
-
-      <Panel title="EHR y comunicación">
-        <InlineForm
-          title="Nuevo record clínico"
-          fields={[
-            { name: "reason", placeholder: "Motivo" },
-            { name: "notes", placeholder: "Notas clínicas" }
-          ]}
-          extraField={
-            <>
-              <select name="petId" required>
-                <option value="">Mascota</option>
-                {props.pets.map((pet) => <option key={pet.id} value={pet.id}>{pet.name}</option>)}
-              </select>
-              <select name="clinicId" required>
-                <option value="">Clínica</option>
-                {props.clinics.map((clinic) => <option key={clinic.id} value={clinic.id}>{clinic.legalName}</option>)}
-              </select>
-            </>
-          }
-          onSubmit={(data) => props.submitJson("/ehr/records", data)}
-        />
-
-        <InlineForm
-          title="Vacunación"
-          fields={[
-            { name: "vaccineCode", placeholder: "Código" },
-            { name: "date", type: "date", placeholder: "Fecha" },
-            { name: "batch", placeholder: "Lote" }
-          ]}
-          extraField={
-            <>
-              <select name="petId" required>
-                <option value="">Mascota</option>
-                {props.pets.map((pet) => <option key={pet.id} value={pet.id}>{pet.name}</option>)}
-              </select>
-              <select name="clinicId" required>
-                <option value="">Clínica</option>
-                {props.clinics.map((clinic) => <option key={clinic.id} value={clinic.id}>{clinic.legalName}</option>)}
-              </select>
-            </>
-          }
-          onSubmit={(data) => props.submitJson("/ehr/vaccinations", data)}
-        />
-
-        <InlineForm
-          title="Prescripción"
-          fields={[
-            { name: "drug", placeholder: "Medicamento" },
-            { name: "dose", placeholder: "Dosis" },
-            { name: "frequency", placeholder: "Frecuencia" },
-            { name: "start", type: "date", placeholder: "Inicio" },
-            { name: "end", type: "date", placeholder: "Fin" },
-            { name: "notes", placeholder: "Notas" }
-          ]}
-          extraField={
-            <>
-              <select name="petId" required>
-                <option value="">Mascota</option>
-                {props.pets.map((pet) => <option key={pet.id} value={pet.id}>{pet.name}</option>)}
-              </select>
-              <select name="clinicId" required>
-                <option value="">Clínica</option>
-                {props.clinics.map((clinic) => <option key={clinic.id} value={clinic.id}>{clinic.legalName}</option>)}
-              </select>
-            </>
-          }
-          onSubmit={(data) => props.submitJson("/ehr/prescriptions", data)}
-        />
-
-        <InlineForm
-          title="Notificación manual"
-          fields={[
-            { name: "title", placeholder: "Título" },
-            { name: "message", placeholder: "Mensaje" }
-          ]}
-          extraField={
-            <>
-              <select name="clinicId">
-                <option value="">Clínica opcional</option>
-                {props.clinics.map((clinic) => <option key={clinic.id} value={clinic.id}>{clinic.legalName}</option>)}
-              </select>
-              <input name="userId" placeholder="Usuario opcional" />
-            </>
-          }
-          onSubmit={(data) => props.submitJson("/notifications/send", data)}
-        />
-      </Panel>
-
-      <Panel title="Analítica y agenda">
-        {props.analytics?.global ? (
-          <div className="analytics-grid">
-            <article className="metric-card"><span>Revenue</span><strong>${props.analytics.global.revenue.toLocaleString("es-CO")}</strong></article>
-            <article className="metric-card"><span>Citas</span><strong>{props.analytics.global.totalAppointments}</strong></article>
-            <article className="metric-card"><span>Telemed</span><strong>{props.analytics.global.telemedCount}</strong></article>
-          </div>
-        ) : (
-          <p className="muted">La analítica se alimenta cuando el flujo empieza a emitir eventos.</p>
-        )}
-
-        <div className="list-grid">
-          {props.appointments.map((appointment) => (
-            <article key={appointment.id} className="compact-card">
-              <strong>{appointment.type}</strong>
-              <span>{formatDate(appointment.startTime)}</span>
-              <small>{appointment.status}</small>
-              {appointment.status === "CONFIRMED" ? (
-                <button onClick={() => void props.submitJson(`/appointments/${appointment.id}/complete`, {})}>
-                  Completar
-                </button>
-              ) : null}
-            </article>
-          ))}
-        </div>
-      </Panel>
-    </section>
-  );
-}
-
-function AdminColumn(props: {
-  users: AdminUser[];
-  updateRoles: (userId: string, roles: Role[]) => Promise<void>;
-}) {
-  return (
-    <section className="workspace-column">
-      <Panel title="Administración central">
-        <div className="list-grid">
-          {props.users.map((adminUser) => (
-            <article key={adminUser.id} className="user-card">
-              <div>
-                <strong>{adminUser.fullName}</strong>
-                <span>{adminUser.email}</span>
-                <small>{adminUser.id}</small>
-              </div>
-              <div className="role-actions">
-                <button onClick={() => void props.updateRoles(adminUser.id, ["OWNER"])}>OWNER</button>
-                <button onClick={() => void props.updateRoles(adminUser.id, ["CLINIC_ADMIN"])}>CLINIC_ADMIN</button>
-                <button onClick={() => void props.updateRoles(adminUser.id, ["VET"])}>VET</button>
-                <button onClick={() => void props.updateRoles(adminUser.id, ["RECEPTIONIST"])}>RECEPTIONIST</button>
-                <button onClick={() => void props.updateRoles(adminUser.id, ["ADMIN"])}>ADMIN</button>
-              </div>
-            </article>
-          ))}
-        </div>
-      </Panel>
-    </section>
   );
 }
