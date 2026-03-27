@@ -19,6 +19,7 @@ const port = getNumberEnv("GATEWAY_PORT", 8080);
 const publicKey = requireEnv("JWT_PUBLIC_KEY");
 const issuer = requireEnv("JWT_ISSUER");
 const audience = requireEnv("JWT_AUDIENCE");
+const allowedOrigins = new Set(getAllowedOrigins());
 
 const targets = {
   "/users": requireEnv("USER_SERVICE_URL"),
@@ -33,9 +34,41 @@ const targets = {
 
 app.disable("x-powered-by");
 app.use(express.json());
+app.use((req, res, next) => {
+  const origin = req.header("origin");
+
+  if (origin && allowedOrigins.has(origin)) {
+    res.setHeader("Access-Control-Allow-Origin", origin);
+    res.setHeader("Vary", "Origin");
+  }
+
+  res.setHeader(
+    "Content-Security-Policy",
+    "default-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'"
+  );
+  res.setHeader("Cross-Origin-Resource-Policy", "same-origin");
+  res.setHeader("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
+  res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  res.setHeader("X-Frame-Options", "DENY");
+
+  const forwardedProto = req.header("x-forwarded-proto");
+  if (forwardedProto === "https" || req.secure) {
+    res.setHeader("Strict-Transport-Security", "max-age=63072000; includeSubDomains; preload");
+  }
+
+  next();
+});
 app.use(
   cors({
-    origin: getAllowedOrigins(),
+    origin(origin, callback) {
+      if (!origin) {
+        callback(null, false);
+        return;
+      }
+
+      callback(null, allowedOrigins.has(origin));
+    },
     credentials: true
   })
 );

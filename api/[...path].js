@@ -18,6 +18,20 @@ const hopByHopHeaders = new Set([
   "content-length"
 ]);
 
+const controlledHeaders = new Set([
+  "access-control-allow-origin",
+  "access-control-allow-credentials",
+  "access-control-allow-methods",
+  "access-control-allow-headers",
+  "content-security-policy",
+  "cross-origin-resource-policy",
+  "permissions-policy",
+  "referrer-policy",
+  "strict-transport-security",
+  "x-content-type-options",
+  "x-frame-options"
+]);
+
 function getGatewayBaseUrl() {
   const configured =
     process.env.PETWELL_GATEWAY_URL?.trim() || process.env.PETWELL_API_BASE?.trim();
@@ -49,12 +63,39 @@ function copyRequestHeaders(req) {
 
 function setResponseHeaders(res, upstream) {
   upstream.headers.forEach((value, key) => {
-    if (hopByHopHeaders.has(key.toLowerCase())) {
+    const lowerKey = key.toLowerCase();
+    if (hopByHopHeaders.has(lowerKey) || controlledHeaders.has(lowerKey)) {
       return;
     }
 
     res.setHeader(key, value);
   });
+}
+
+function resolveAllowedOrigin(req) {
+  const originHeader = req.headers.origin;
+  const origin = Array.isArray(originHeader) ? originHeader[0] : originHeader;
+  return origin || requestBaseUrl(req);
+}
+
+function applySecurityHeaders(req, res) {
+  const allowedOrigin = resolveAllowedOrigin(req);
+
+  res.setHeader("Access-Control-Allow-Origin", allowedOrigin);
+  res.setHeader("Access-Control-Allow-Credentials", "true");
+  res.setHeader("Access-Control-Allow-Methods", "GET,POST,PUT,PATCH,DELETE,OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Authorization,Content-Type,X-Correlation-Id");
+  res.setHeader(
+    "Content-Security-Policy",
+    "default-src 'self'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; object-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self' https: wss:; manifest-src 'self'; worker-src 'self' blob:; media-src 'self' blob:; upgrade-insecure-requests"
+  );
+  res.setHeader("Cross-Origin-Resource-Policy", "same-origin");
+  res.setHeader("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
+  res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
+  res.setHeader("Strict-Transport-Security", "max-age=63072000; includeSubDomains; preload");
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  res.setHeader("X-Frame-Options", "DENY");
+  res.setHeader("Vary", "Origin");
 }
 
 function requestBaseUrl(req) {
@@ -117,11 +158,20 @@ async function proxyToGateway(req, res, incomingUrl, rawBody) {
   }
 
   setResponseHeaders(res, upstream);
+  applySecurityHeaders(req, res);
   res.statusCode = upstream.status;
   res.end(payload);
 }
 
 export default async function handler(req, res) {
+  applySecurityHeaders(req, res);
+
+  if ((req.method ?? "GET").toUpperCase() === "OPTIONS") {
+    res.statusCode = 204;
+    res.end();
+    return;
+  }
+
   const incomingUrl = new URL(req.url ?? "/api", "https://petwell.local");
   const rawBody =
     req.method && !["GET", "HEAD"].includes(req.method.toUpperCase()) ? await buffer(req) : null;
