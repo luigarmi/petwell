@@ -1,0 +1,144 @@
+global:
+  scrape_interval: 15s
+
+scrape_configs:
+  - job_name: api-gateway
+    metrics_path: /metrics
+    static_configs:
+      - targets: ['api-gateway:3000']
+  - job_name: user-service
+    metrics_path: /metrics
+    static_configs:
+      - targets: ['user-service:3001']
+  - job_name: pet-service
+    metrics_path: /metrics
+    static_configs:
+      - targets: ['pet-service:3002']
+  - job_name: ehr-service
+    metrics_path: /metrics
+    static_configs:
+      - targets: ['ehr-service:3003']
+  - job_name: appointment-service
+    metrics_path: /metrics
+    static_configs:
+      - targets: ['appointment-service:3004']
+  - job_name: billing-service
+    metrics_path: /metrics
+    static_configs:
+      - targets: ['billing-service:3005']
+  - job_name: telemed-service
+    metrics_path: /metrics
+    static_configs:
+      - targets: ['telemed-service:3006']
+  - job_name: notification-service
+    metrics_path: /metrics
+    static_configs:
+      - targets: ['notification-service:3007']
+  - job_name: analytics-service
+    metrics_path: /metrics
+    static_configs:
+      - targets: ['analytics-service:3008']
+  - job_name: petwell-readiness
+    metrics_path: /probe
+    params:
+      module: [http_2xx]
+    static_configs:
+      - targets: ['http://api-gateway:3000/health/ready']
+        labels:
+          probe: readiness
+          service: api-gateway
+      - targets: ['http://user-service:3001/health/ready']
+        labels:
+          probe: readiness
+          service: user-service
+      - targets: ['http://pet-service:3002/health/ready']
+        labels:
+          probe: readiness
+          service: pet-service
+      - targets: ['http://ehr-service:3003/health/ready']
+        labels:
+          probe: readiness
+          service: ehr-service
+      - targets: ['http://appointment-service:3004/health/ready']
+        labels:
+          probe: readiness
+          service: appointment-service
+      - targets: ['http://billing-service:3005/health/ready']
+        labels:
+          probe: readiness
+          service: billing-service
+      - targets: ['http://telemed-service:3006/health/ready']
+        labels:
+          probe: readiness
+          service: telemed-service
+      - targets: ['http://notification-service:3007/health/ready']
+        labels:
+          probe: readiness
+          service: notification-service
+      - targets: ['http://analytics-service:3008/health/ready']
+        labels:
+          probe: readiness
+          service: analytics-service
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: blackbox-exporter:9115
+  - job_name: petwell-liveness
+    metrics_path: /probe
+    params:
+      module: [http_2xx]
+    static_configs:
+      - targets: ['http://api-gateway:3000/health/live']
+        labels:
+          probe: liveness
+          service: api-gateway
+      - targets: ['http://user-service:3001/health/live']
+        labels:
+          probe: liveness
+          service: user-service
+      - targets: ['http://pet-service:3002/health/live']
+        labels:
+          probe: liveness
+          service: pet-service
+      - targets: ['http://ehr-service:3003/health/live']
+        labels:
+          probe: liveness
+          service: ehr-service
+      - targets: ['http://appointment-service:3004/health/live']
+        labels:
+          probe: liveness
+          service: appointment-service
+      - targets: ['http://billing-service:3005/health/live']
+        labels:
+          probe: liveness
+          service: billing-service
+      - targets: ['http://telemed-service:3006/health/live']
+        labels:
+          probe: liveness
+          service: telemed-service
+      - targets: ['http://notification-service:3007/health/live']
+        labels:
+          probe: liveness
+          service: notification-service
+      - targets: ['http://analytics-service:3008/health/live']
+        labels:
+          probe: liveness
+          service: analytics-service
+      - targets: ['http://frontend-public-web:3001/']
+        labels:
+          probe: liveness
+          service: frontend-public-web
+      - targets: ['http://frontend-admin-web:3002/admin/login']
+        labels:
+          probe: liveness
+          service: frontend-admin-web
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: blackbox-exporter:9115

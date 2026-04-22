@@ -1,0 +1,81 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../node_modules/@petwell/prisma-billing-service-client"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum PaymentStatus {
+  created
+  pending
+  approved
+  declined
+  failed
+  expired
+  refunded
+  partially_refunded
+}
+
+enum PaymentProvider {
+  mock
+  wompi
+  mercadopago
+}
+
+model PaymentAttempt {
+  id                  String             @id
+  appointmentId       String
+  ownerId             String
+  clinicId            String
+  provider            PaymentProvider
+  status              PaymentStatus
+  currency            String
+  amountCop           Int
+  externalReference   String             @unique
+  providerTransactionId String?
+  checkoutUrl         String?
+  checkoutPayload     Json?
+  appointmentMetadata Json?
+  idempotencyKey      String             @unique
+  expiresAt           DateTime?
+  approvedAt          DateTime?
+  declinedAt          DateTime?
+  expiredAt           DateTime?
+  refundedAt          DateTime?
+  receiptUrl          String?
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
+  histories           PaymentHistory[]
+  webhooks            WebhookEvent[]
+
+  @@index([appointmentId, createdAt])
+  @@index([status, createdAt])
+}
+
+model PaymentHistory {
+  id        String        @id
+  paymentId String
+  status    PaymentStatus
+  source    String
+  payload   Json?
+  createdAt DateTime      @default(now())
+  payment   PaymentAttempt @relation(fields: [paymentId], references: [id])
+
+  @@index([paymentId, createdAt])
+}
+
+model WebhookEvent {
+  id              String          @id
+  provider        PaymentProvider
+  externalEventId String
+  paymentId       String?
+  signatureValid  Boolean
+  payload         Json
+  processedAt     DateTime        @default(now())
+  payment         PaymentAttempt? @relation(fields: [paymentId], references: [id])
+
+  @@unique([provider, externalEventId])
+}

@@ -1,0 +1,124 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../node_modules/@petwell/prisma-user-service-client"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  superadmin
+  clinic_admin
+  veterinarian
+  receptionist
+  pet_owner
+}
+
+model User {
+  id                  String               @id
+  email               String               @unique
+  passwordHash        String
+  firstName           String
+  lastName            String
+  phone               String
+  role                UserRole
+  professionalLicense String?
+  avatarUrl           String?
+  isEmailVerified     Boolean              @default(false)
+  isDemo              Boolean              @default(false)
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+  deletedAt           DateTime?
+  clinicMemberships   ClinicStaff[]
+  refreshSessions     RefreshSession[]
+  passwordResetTokens PasswordResetToken[]
+
+  @@index([role])
+  @@index([deletedAt])
+}
+
+model Clinic {
+  id           String                 @id
+  name         String
+  email        String
+  phone        String
+  address      String
+  city         String
+  country      String
+  nit          String?
+  logoUrl      String?
+  website      String?
+  billingEmail String?
+  specialties  String[]               @default([])
+  createdAt    DateTime               @default(now())
+  updatedAt    DateTime               @updatedAt
+  deletedAt    DateTime?
+  staff        ClinicStaff[]
+  services     ClinicServiceCatalog[]
+
+  @@index([city])
+  @@index([deletedAt])
+}
+
+model ClinicStaff {
+  id          String   @id
+  clinicId    String
+  userId      String
+  role        UserRole
+  specialties String[] @default([])
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  clinic      Clinic   @relation(fields: [clinicId], references: [id])
+  user        User     @relation(fields: [userId], references: [id])
+
+  @@unique([clinicId, userId])
+  @@index([userId])
+}
+
+model ClinicServiceCatalog {
+  id                 String   @id
+  clinicId           String
+  appointmentType    String
+  name               String
+  durationMinutes    Int
+  priceCop           Int
+  isTelemedAvailable Boolean  @default(false)
+  active             Boolean  @default(true)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+  clinic             Clinic   @relation(fields: [clinicId], references: [id])
+
+  @@unique([clinicId, appointmentType])
+  @@index([clinicId, active])
+}
+
+model RefreshSession {
+  id                  String   @id
+  userId              String
+  tokenHash           String
+  expiresAt           DateTime
+  revokedAt           DateTime?
+  replacedBySessionId String?
+  userAgent           String?
+  ipAddress           String?
+  createdAt           DateTime @default(now())
+  user                User     @relation(fields: [userId], references: [id])
+
+  @@index([userId, revokedAt])
+  @@index([expiresAt])
+}
+
+model PasswordResetToken {
+  id         String   @id
+  userId     String
+  tokenHash  String
+  expiresAt  DateTime
+  consumedAt DateTime?
+  createdAt  DateTime @default(now())
+  user       User     @relation(fields: [userId], references: [id])
+
+  @@index([userId, expiresAt])
+}

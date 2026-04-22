@@ -1,0 +1,30 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+  --font-heading: "Iowan Old Style", "Palatino Linotype", "Book Antiqua", Georgia, serif;
+  --font-body: Aptos, "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+}
+
+body {
+  @apply min-h-screen bg-paper text-slate-900 antialiased;
+  background-image:
+    radial-gradient(circle at top left, rgba(75, 124, 116, 0.14), transparent 30%),
+    radial-gradient(circle at top right, rgba(23, 63, 95, 0.1), transparent 28%),
+    linear-gradient(180deg, #f8f5ef 0%, #eef2f4 52%, #f7f8fb 100%);
+}
+
+input, select, textarea {
+  @apply w-full rounded-2xl border border-black/10 bg-white px-4 py-3 text-sm outline-none transition focus:border-navy/25 focus:bg-white focus:shadow-[0_0_0_4px_rgba(23,63,95,0.08)];
+}
+
+button {
+  @apply inline-flex items-center justify-center gap-2 rounded-2xl px-4 py-3 font-medium transition duration-150 hover:-translate-y-0.5;
+}
+
+::selection {
+  background: rgba(23, 63, 95, 0.15);
+  color: #173f5f;
+}

@@ -1,0 +1,27 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../node_modules/@petwell/prisma-telemed-service-client"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model TelemedRoom {
+  id              String   @id
+  appointmentId   String   @unique
+  clinicId        String
+  ownerId         String
+  veterinarianId  String
+  provider        String
+  roomUrl         String
+  joinToken       String
+  startsAt        DateTime
+  expiresAt       DateTime
+  durationMinutes Int
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([clinicId, startsAt])
+}

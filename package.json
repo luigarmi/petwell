@@ -1,0 +1,37 @@
+{
+  "name": "petwell",
+  "private": true,
+  "version": "1.0.0",
+  "packageManager": "pnpm@9.15.1",
+  "scripts": {
+    "build": "corepack pnpm build:packages && corepack pnpm prisma:generate && corepack pnpm build:apps",
+    "build:packages": "corepack pnpm -r --filter \"./packages/*\" build",
+    "build:apps": "corepack pnpm -r --filter \"./apps/*\" build",
+    "dev": "docker compose up --build",
+    "down": "docker compose down -v",
+    "prisma:generate": "corepack pnpm -r --workspace-concurrency=1 --filter \"./apps/*-service\" prisma:generate",
+    "migrate:deploy": "corepack pnpm -r --filter \"./apps/*-service\" prisma:migrate:deploy",
+    "migrate:dev": "corepack pnpm -r --filter \"./apps/*-service\" prisma:migrate:dev",
+    "seed": "corepack pnpm -r --filter \"./apps/*-service\" seed",
+    "test": "corepack pnpm prisma:generate && corepack pnpm -r --filter \"./packages/*\" test && corepack pnpm build:packages && corepack pnpm -r --filter \"./apps/*\" test",
+    "test:e2e": "corepack pnpm build:packages && corepack pnpm --filter @petwell/user-service test:e2e && corepack pnpm --filter @petwell/pet-service test:e2e && corepack pnpm --filter @petwell/appointment-service test:e2e && corepack pnpm --filter @petwell/ehr-service test:e2e && corepack pnpm --filter @petwell/billing-service test:e2e",
+    "test:e2e:critical": "tsx scripts/e2e-critical.ts",
+    "validate:ops": "docker compose config --quiet && node scripts/validate-assets.mjs && corepack pnpm exec tsc --noEmit --target ES2022 --module commonjs --moduleResolution node --esModuleInterop --lib ES2022,DOM scripts/e2e-critical.ts",
+    "lint": "corepack pnpm prisma:generate && corepack pnpm -r --filter \"./packages/*\" lint && corepack pnpm build:packages && corepack pnpm -r --filter \"./apps/*\" lint",
+    "prepare": "node -e \"console.log('Use corepack pnpm install to bootstrap the workspace.')\""
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.0",
+    "@types/amqplib": "^0.10.7",
+    "@types/node": "^22.13.5",
+    "@types/nodemailer": "^6.4.17",
+    "@types/passport": "^1.0.17",
+    "@types/passport-jwt": "^4.0.1",
+    "@types/pdfkit": "^0.17.3",
+    "@types/supertest": "^6.0.3",
+    "supertest": "^7.0.0",
+    "tsup": "^8.3.5",
+    "tsx": "^4.19.3",
+    "typescript": "^5.7.3"
+  }
+}

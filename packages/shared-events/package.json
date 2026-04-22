@@ -1,0 +1,17 @@
+{
+  "name": "@petwell/shared-events",
+  "version": "1.0.0",
+  "private": true,
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsup src/index.ts --format cjs --dts",
+    "lint": "tsc --noEmit -p tsconfig.json",
+    "test": "tsx --test src/**/*.test.ts"
+  },
+  "dependencies": {
+    "@petwell/shared-types": "workspace:*",
+    "amqplib": "^0.10.5",
+    "uuid": "^11.1.0"
+  }
+}

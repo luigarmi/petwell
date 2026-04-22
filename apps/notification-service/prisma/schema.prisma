@@ -1,0 +1,38 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../node_modules/@petwell/prisma-notification-service-client"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum NotificationStatus {
+  queued
+  sent
+  failed
+}
+
+model Notification {
+  id                String              @id
+  userId            String?
+  clinicId          String?
+  channel           String
+  recipient         String
+  subject           String
+  template          String
+  dedupeKey         String?             @unique
+  variables         Json?
+  status            NotificationStatus
+  attempts          Int                 @default(0)
+  lastError         String?
+  providerMessageId String?
+  sentAt            DateTime?
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+
+  @@index([userId, createdAt])
+  @@index([clinicId, createdAt])
+  @@index([status, createdAt])
+}

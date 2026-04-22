@@ -1,0 +1,23 @@
+name: petwell-ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: corepack enable
+      - run: corepack pnpm install
+      - run: corepack pnpm build:packages
+      - run: corepack pnpm --filter "./apps/*-service" prisma:generate
+      - run: corepack pnpm build:apps
+      - run: corepack pnpm validate:ops
+      - run: corepack pnpm lint
+      - run: corepack pnpm test

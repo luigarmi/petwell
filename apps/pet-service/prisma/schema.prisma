@@ -1,0 +1,49 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../node_modules/@petwell/prisma-pet-service-client"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum PetSpecies {
+  dog
+  cat
+  bird
+  rabbit
+  other
+}
+
+enum PetSex {
+  male
+  female
+  unknown
+}
+
+model Pet {
+  id               String     @id
+  ownerId          String
+  coOwnerIds       String[]   @default([])
+  name             String
+  species          PetSpecies
+  breed            String
+  sex              PetSex
+  weightKg         Float
+  birthDate        DateTime
+  microchip        String?
+  allergies        String[]   @default([])
+  photoUrls        String[]   @default([])
+  color            String?
+  isSpayedNeutered Boolean    @default(false)
+  mainClinicId     String?
+  createdAt        DateTime   @default(now())
+  updatedAt        DateTime   @updatedAt
+  deletedAt        DateTime?
+
+  @@index([ownerId])
+  @@index([mainClinicId])
+  @@index([species])
+  @@index([deletedAt])
+}

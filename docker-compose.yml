@@ -1,0 +1,747 @@
+services:
+  user-db:
+    image: postgres:16-alpine
+    init: true
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: petwell_user
+    ports:
+      - "5433:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d petwell_user"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    volumes:
+      - user_db_data:/var/lib/postgresql/data
+
+  pet-db:
+    image: postgres:16-alpine
+    init: true
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: petwell_pet
+    ports:
+      - "5434:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d petwell_pet"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    volumes:
+      - pet_db_data:/var/lib/postgresql/data
+
+  ehr-db:
+    image: postgres:16-alpine
+    init: true
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: petwell_ehr
+    ports:
+      - "5435:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d petwell_ehr"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    volumes:
+      - ehr_db_data:/var/lib/postgresql/data
+
+  appointment-db:
+    image: postgres:16-alpine
+    init: true
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: petwell_appointment
+    ports:
+      - "5436:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d petwell_appointment"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    volumes:
+      - appointment_db_data:/var/lib/postgresql/data
+
+  telemed-db:
+    image: postgres:16-alpine
+    init: true
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: petwell_telemed
+    ports:
+      - "5437:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d petwell_telemed"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    volumes:
+      - telemed_db_data:/var/lib/postgresql/data
+
+  notification-db:
+    image: postgres:16-alpine
+    init: true
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: petwell_notification
+    ports:
+      - "5438:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d petwell_notification"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    volumes:
+      - notification_db_data:/var/lib/postgresql/data
+
+  billing-db:
+    image: postgres:16-alpine
+    init: true
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: petwell_billing
+    ports:
+      - "5439:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d petwell_billing"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    volumes:
+      - billing_db_data:/var/lib/postgresql/data
+
+  analytics-db:
+    image: postgres:16-alpine
+    init: true
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: petwell_analytics
+    ports:
+      - "5440:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d petwell_analytics"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    volumes:
+      - analytics_db_data:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7-alpine
+    init: true
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 5s
+
+  rabbitmq:
+    image: rabbitmq:3.13-management-alpine
+    init: true
+    restart: unless-stopped
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 15s
+      timeout: 15s
+      retries: 10
+      start_period: 90s
+
+  rabbitmq-ready:
+    image: rabbitmq:3.13-management-alpine
+    init: true
+    restart: "no"
+    entrypoint: ["/bin/sh", "-lc", "until nc -z rabbitmq 5672; do sleep 2; done"]
+    depends_on:
+      rabbitmq:
+        condition: service_started
+
+  mailpit:
+    image: axllent/mailpit:v1.20
+    init: true
+    restart: unless-stopped
+    ports:
+      - "1025:1025"
+      - "8025:8025"
+
+  minio:
+    image: minio/minio:RELEASE.2025-01-20T14-49-07Z
+    init: true
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio_data:/data
+
+  minio-init:
+    image: minio/mc:RELEASE.2025-01-17T23-25-50Z
+    depends_on:
+      - minio
+    entrypoint: >
+      /bin/sh -c "
+      until mc alias set local http://minio:9000 minioadmin minioadmin; do sleep 2; done &&
+      mc mb -p local/petwell-assets || true &&
+      mc anonymous set download local/petwell-assets || true
+      "
+
+  api-gateway:
+    init: true
+    restart: unless-stopped
+    build:
+      context: .
+      dockerfile: apps/api-gateway/Dockerfile
+    command: ["node", "apps/api-gateway/dist/src/main.js"]
+    environment:
+      NODE_ENV: development
+      PORT: 3000
+      SERVICE_NAME: api-gateway
+      CORS_ORIGIN: http://localhost
+      JWT_ACCESS_SECRET: change-me-access-secret
+      JWT_REFRESH_SECRET: change-me-refresh-secret
+      JWT_ACCESS_TTL: 15m
+      JWT_REFRESH_TTL: 7d
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672
+      REDIS_URL: redis://redis:6379
+      USER_SERVICE_URL: http://user-service:3001
+      PET_SERVICE_URL: http://pet-service:3002
+      EHR_SERVICE_URL: http://ehr-service:3003
+      APPOINTMENT_SERVICE_URL: http://appointment-service:3004
+      TELEMED_SERVICE_URL: http://telemed-service:3006
+      NOTIFICATION_SERVICE_URL: http://notification-service:3007
+      BILLING_SERVICE_URL: http://billing-service:3005
+      ANALYTICS_SERVICE_URL: http://analytics-service:3008
+      LOG_FILE_PATH: /var/log/petwell/api-gateway.log
+    depends_on:
+      redis:
+        condition: service_healthy
+      user-service:
+        condition: service_healthy
+      pet-service:
+        condition: service_healthy
+      ehr-service:
+        condition: service_healthy
+      appointment-service:
+        condition: service_healthy
+      telemed-service:
+        condition: service_healthy
+      notification-service:
+        condition: service_healthy
+      billing-service:
+        condition: service_healthy
+      analytics-service:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3000/health/ready || exit 1"]
+      interval: 20s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    volumes:
+      - ./logs:/var/log/petwell
+
+  user-service:
+    init: true
+    restart: unless-stopped
+    build:
+      context: .
+      dockerfile: apps/user-service/Dockerfile
+    command: ["node", "apps/user-service/dist/src/main.js"]
+    environment:
+      NODE_ENV: development
+      PORT: 3001
+      SERVICE_NAME: user-service
+      CORS_ORIGIN: http://localhost
+      DATABASE_URL: postgresql://postgres:postgres@user-db:5432/petwell_user
+      JWT_ACCESS_SECRET: change-me-access-secret
+      JWT_REFRESH_SECRET: change-me-refresh-secret
+      JWT_ACCESS_TTL: 15m
+      JWT_REFRESH_TTL: 7d
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672
+      REDIS_URL: redis://redis:6379
+      PUBLIC_APP_URL: http://localhost
+      MAIL_FROM: hello@petwell.local
+      LOG_FILE_PATH: /var/log/petwell/user-service.log
+    depends_on:
+      user-db:
+        condition: service_healthy
+      rabbitmq-ready:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3001/health/ready || exit 1"]
+      interval: 20s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    volumes:
+      - ./logs:/var/log/petwell
+
+  pet-service:
+    init: true
+    restart: unless-stopped
+    build:
+      context: .
+      dockerfile: apps/pet-service/Dockerfile
+    command: ["node", "apps/pet-service/dist/src/main.js"]
+    environment:
+      NODE_ENV: development
+      PORT: 3002
+      SERVICE_NAME: pet-service
+      CORS_ORIGIN: http://localhost
+      DATABASE_URL: postgresql://postgres:postgres@pet-db:5432/petwell_pet
+      JWT_ACCESS_SECRET: change-me-access-secret
+      JWT_REFRESH_SECRET: change-me-refresh-secret
+      JWT_ACCESS_TTL: 15m
+      JWT_REFRESH_TTL: 7d
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672
+      REDIS_URL: redis://redis:6379
+      LOG_FILE_PATH: /var/log/petwell/pet-service.log
+    depends_on:
+      pet-db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3002/health/ready || exit 1"]
+      interval: 20s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    volumes:
+      - ./logs:/var/log/petwell
+
+  ehr-service:
+    init: true
+    restart: unless-stopped
+    build:
+      context: .
+      dockerfile: apps/ehr-service/Dockerfile
+    command: ["node", "apps/ehr-service/dist/src/main.js"]
+    environment:
+      NODE_ENV: development
+      PORT: 3003
+      SERVICE_NAME: ehr-service
+      CORS_ORIGIN: http://localhost
+      DATABASE_URL: postgresql://postgres:postgres@ehr-db:5432/petwell_ehr
+      JWT_ACCESS_SECRET: change-me-access-secret
+      JWT_REFRESH_SECRET: change-me-refresh-secret
+      JWT_ACCESS_TTL: 15m
+      JWT_REFRESH_TTL: 7d
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672
+      REDIS_URL: redis://redis:6379
+      FIELD_ENCRYPTION_KEY: change-me-32-byte-field-key-123456
+      PET_SERVICE_URL: http://pet-service:3002
+      EHR_STORAGE_PATH: /var/lib/petwell-ehr
+      LOG_FILE_PATH: /var/log/petwell/ehr-service.log
+    depends_on:
+      ehr-db:
+        condition: service_healthy
+      pet-service:
+        condition: service_healthy
+      rabbitmq-ready:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3003/health/ready || exit 1"]
+      interval: 20s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    volumes:
+      - ./logs:/var/log/petwell
+      - ehr_storage_data:/var/lib/petwell-ehr
+
+  appointment-service:
+    init: true
+    restart: unless-stopped
+    build:
+      context: .
+      dockerfile: apps/appointment-service/Dockerfile
+    command: ["node", "apps/appointment-service/dist/src/main.js"]
+    environment:
+      NODE_ENV: development
+      PORT: 3004
+      SERVICE_NAME: appointment-service
+      CORS_ORIGIN: http://localhost
+      DATABASE_URL: postgresql://postgres:postgres@appointment-db:5432/petwell_appointment
+      JWT_ACCESS_SECRET: change-me-access-secret
+      JWT_REFRESH_SECRET: change-me-refresh-secret
+      JWT_ACCESS_TTL: 15m
+      JWT_REFRESH_TTL: 7d
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672
+      REDIS_URL: redis://redis:6379
+      USER_SERVICE_URL: http://user-service:3001
+      LOG_FILE_PATH: /var/log/petwell/appointment-service.log
+    depends_on:
+      appointment-db:
+        condition: service_healthy
+      user-service:
+        condition: service_healthy
+      rabbitmq-ready:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3004/health/ready || exit 1"]
+      interval: 20s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    volumes:
+      - ./logs:/var/log/petwell
+
+  billing-service:
+    init: true
+    restart: unless-stopped
+    build:
+      context: .
+      dockerfile: apps/billing-service/Dockerfile
+    command: ["node", "apps/billing-service/dist/src/main.js"]
+    environment:
+      NODE_ENV: development
+      PORT: 3005
+      SERVICE_NAME: billing-service
+      CORS_ORIGIN: ${PUBLIC_APP_URL:-http://localhost}
+      DATABASE_URL: postgresql://postgres:postgres@billing-db:5432/petwell_billing
+      JWT_ACCESS_SECRET: change-me-access-secret
+      JWT_REFRESH_SECRET: change-me-refresh-secret
+      JWT_ACCESS_TTL: 15m
+      JWT_REFRESH_TTL: 7d
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672
+      REDIS_URL: redis://redis:6379
+      PAYMENT_PROVIDER: ${PAYMENT_PROVIDER:-mock}
+      PAYMENT_CURRENCY: COP
+      PUBLIC_APP_URL: ${PUBLIC_APP_URL:-http://localhost}
+      API_PUBLIC_URL: ${API_PUBLIC_URL:-http://localhost/api}
+      MERCADOPAGO_SANDBOX_ACCESS_TOKEN: ${MERCADOPAGO_SANDBOX_ACCESS_TOKEN:-}
+      MERCADOPAGO_SANDBOX_WEBHOOK_SECRET: ${MERCADOPAGO_SANDBOX_WEBHOOK_SECRET:-}
+      MERCADOPAGO_PRODUCTION_ACCESS_TOKEN: ${MERCADOPAGO_PRODUCTION_ACCESS_TOKEN:-}
+      MERCADOPAGO_PRODUCTION_WEBHOOK_SECRET: ${MERCADOPAGO_PRODUCTION_WEBHOOK_SECRET:-}
+      MINIO_ENDPOINT: minio
+      MINIO_PORT: 9000
+      MINIO_ACCESS_KEY: minioadmin
+      MINIO_SECRET_KEY: minioadmin
+      MINIO_BUCKET: petwell-assets
+      MINIO_USE_SSL: "false"
+      LOG_FILE_PATH: /var/log/petwell/billing-service.log
+    depends_on:
+      billing-db:
+        condition: service_healthy
+      rabbitmq-ready:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+      minio-init:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3005/health/ready || exit 1"]
+      interval: 20s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    volumes:
+      - ./logs:/var/log/petwell
+
+  telemed-service:
+    init: true
+    restart: unless-stopped
+    build:
+      context: .
+      dockerfile: apps/telemed-service/Dockerfile
+    command: ["node", "apps/telemed-service/dist/src/main.js"]
+    environment:
+      NODE_ENV: development
+      PORT: 3006
+      SERVICE_NAME: telemed-service
+      CORS_ORIGIN: ${PUBLIC_APP_URL:-http://localhost}
+      DATABASE_URL: postgresql://postgres:postgres@telemed-db:5432/petwell_telemed
+      JWT_ACCESS_SECRET: change-me-access-secret
+      JWT_REFRESH_SECRET: change-me-refresh-secret
+      JWT_ACCESS_TTL: 15m
+      JWT_REFRESH_TTL: 7d
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672
+      REDIS_URL: redis://redis:6379
+      PUBLIC_APP_URL: ${PUBLIC_APP_URL:-http://localhost}
+      TELEMED_PROVIDER: ${TELEMED_PROVIDER:-mock}
+      TWILIO_ACCOUNT_SID: ${TWILIO_ACCOUNT_SID:-}
+      TWILIO_API_KEY: ${TWILIO_API_KEY:-}
+      TWILIO_API_SECRET: ${TWILIO_API_SECRET:-}
+      DAILY_API_KEY: ${DAILY_API_KEY:-}
+      LOG_FILE_PATH: /var/log/petwell/telemed-service.log
+    depends_on:
+      telemed-db:
+        condition: service_healthy
+      rabbitmq-ready:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3006/health/ready || exit 1"]
+      interval: 20s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    volumes:
+      - ./logs:/var/log/petwell
+
+  notification-service:
+    init: true
+    restart: unless-stopped
+    build:
+      context: .
+      dockerfile: apps/notification-service/Dockerfile
+    command: ["node", "apps/notification-service/dist/src/main.js"]
+    environment:
+      NODE_ENV: development
+      PORT: 3007
+      SERVICE_NAME: notification-service
+      CORS_ORIGIN: http://localhost
+      DATABASE_URL: postgresql://postgres:postgres@notification-db:5432/petwell_notification
+      JWT_ACCESS_SECRET: change-me-access-secret
+      JWT_REFRESH_SECRET: change-me-refresh-secret
+      JWT_ACCESS_TTL: 15m
+      JWT_REFRESH_TTL: 7d
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672
+      REDIS_URL: redis://redis:6379
+      MAIL_HOST: mailpit
+      MAIL_PORT: 1025
+      MAIL_FROM: hello@petwell.local
+      USER_SERVICE_URL: http://user-service:3001
+      APPOINTMENT_SERVICE_URL: http://appointment-service:3004
+      PET_SERVICE_URL: http://pet-service:3002
+      LOG_FILE_PATH: /var/log/petwell/notification-service.log
+    depends_on:
+      notification-db:
+        condition: service_healthy
+      mailpit:
+        condition: service_started
+      rabbitmq-ready:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+      user-service:
+        condition: service_healthy
+      appointment-service:
+        condition: service_healthy
+      pet-service:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3007/health/ready || exit 1"]
+      interval: 20s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    volumes:
+      - ./logs:/var/log/petwell
+
+  analytics-service:
+    init: true
+    restart: unless-stopped
+    build:
+      context: .
+      dockerfile: apps/analytics-service/Dockerfile
+    command: ["node", "apps/analytics-service/dist/src/main.js"]
+    environment:
+      NODE_ENV: development
+      PORT: 3008
+      SERVICE_NAME: analytics-service
+      CORS_ORIGIN: http://localhost
+      DATABASE_URL: postgresql://postgres:postgres@analytics-db:5432/petwell_analytics
+      JWT_ACCESS_SECRET: change-me-access-secret
+      JWT_REFRESH_SECRET: change-me-refresh-secret
+      JWT_ACCESS_TTL: 15m
+      JWT_REFRESH_TTL: 7d
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672
+      REDIS_URL: redis://redis:6379
+      BILLING_SERVICE_URL: http://billing-service:3005
+      APPOINTMENT_SERVICE_URL: http://appointment-service:3004
+      PET_SERVICE_URL: http://pet-service:3002
+      LOG_FILE_PATH: /var/log/petwell/analytics-service.log
+    depends_on:
+      analytics-db:
+        condition: service_healthy
+      rabbitmq-ready:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+      billing-service:
+        condition: service_healthy
+      appointment-service:
+        condition: service_healthy
+      pet-service:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3008/health/ready || exit 1"]
+      interval: 20s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    volumes:
+      - ./logs:/var/log/petwell
+
+  frontend-public-web:
+    init: true
+    restart: unless-stopped
+    build:
+      context: .
+      dockerfile: apps/frontend-public-web/Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-/api}
+    entrypoint: ["pnpm", "--filter", "@petwell/frontend-public-web", "start"]
+    environment:
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-/api}
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3001/ || exit 1"]
+      interval: 20s
+      timeout: 5s
+      retries: 10
+      start_period: 25s
+
+  frontend-admin-web:
+    init: true
+    restart: unless-stopped
+    build:
+      context: .
+      dockerfile: apps/frontend-admin-web/Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-/api}
+    entrypoint: ["pnpm", "--filter", "@petwell/frontend-admin-web", "start"]
+    environment:
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-/api}
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3002/admin/login || exit 1"]
+      interval: 20s
+      timeout: 5s
+      retries: 10
+      start_period: 25s
+
+  nginx:
+    image: nginx:1.27-alpine
+    init: true
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    volumes:
+      - ./infra/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      api-gateway:
+        condition: service_healthy
+      frontend-public-web:
+        condition: service_healthy
+      frontend-admin-web:
+        condition: service_healthy
+
+  prometheus:
+    image: prom/prometheus:v3.1.0
+    init: true
+    restart: unless-stopped
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./infra/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    depends_on:
+      - blackbox-exporter
+
+  blackbox-exporter:
+    image: prom/blackbox-exporter:v0.25.0
+    init: true
+    restart: unless-stopped
+    command:
+      - --config.file=/etc/blackbox/blackbox.yml
+    volumes:
+      - ./infra/prometheus/blackbox.yml:/etc/blackbox/blackbox.yml:ro
+
+  loki:
+    image: grafana/loki:3.2.1
+    init: true
+    restart: unless-stopped
+    command:
+      - -config.file=/etc/loki/loki-config.yml
+    ports:
+      - "3100:3100"
+    volumes:
+      - ./infra/loki/loki-config.yml:/etc/loki/loki-config.yml:ro
+      - loki_data:/loki
+
+  promtail:
+    image: grafana/promtail:3.2.1
+    init: true
+    restart: unless-stopped
+    command:
+      - -config.file=/etc/promtail/promtail-config.yml
+    volumes:
+      - ./infra/loki/promtail-config.yml:/etc/promtail/promtail-config.yml:ro
+      - ./logs:/var/log/petwell
+    depends_on:
+      - loki
+
+  grafana:
+    image: grafana/grafana:11.4.0
+    init: true
+    restart: unless-stopped
+    ports:
+      - "3009:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+    volumes:
+      - ./infra/grafana/provisioning/datasources:/etc/grafana/provisioning/datasources:ro
+      - ./infra/grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - ./infra/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    depends_on:
+      - prometheus
+      - loki
+
+volumes:
+  user_db_data:
+  pet_db_data:
+  ehr_db_data:
+  ehr_storage_data:
+  appointment_db_data:
+  telemed_db_data:
+  notification_db_data:
+  billing_db_data:
+  analytics_db_data:
+  rabbitmq_data:
+  minio_data:
+  loki_data:

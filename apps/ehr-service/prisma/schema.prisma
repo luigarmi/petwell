@@ -1,0 +1,71 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../node_modules/@petwell/prisma-ehr-service-client"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model EhrRecord {
+  id                          String       @id
+  petId                       String
+  clinicId                    String
+  veterinarianId              String
+  appointmentId               String?
+  consultationEncrypted       String
+  reasonForVisitEncrypted     String?
+  anamnesisEncrypted          String?
+  physicalExamEncrypted       String?
+  diagnosisEncrypted          String
+  vaccinesEncrypted           String
+  treatmentsEncrypted         String?
+  prescriptionsEncrypted      String
+  labResultsEncrypted         String
+  imagingReportsEncrypted     String?
+  clinicalNotesEncrypted      String
+  createdByUserId             String
+  createdAt                   DateTime     @default(now())
+  updatedAt                   DateTime     @updatedAt
+  deletedAt                   DateTime?
+  accessAudits                AccessAudit[]
+
+  @@index([petId, clinicId])
+  @@index([appointmentId])
+  @@index([deletedAt])
+}
+
+model ClinicConsent {
+  id              String   @id
+  petId           String
+  sourceClinicId  String
+  targetClinicId  String
+  grantedByUserId String
+  purpose         String?
+  scopeSummary    String?
+  ownerApprovedByUserId String?
+  ownerApprovedAt DateTime?
+  grantedAt       DateTime @default(now())
+  expiresAt       DateTime?
+  revokedAt       DateTime?
+
+  @@unique([petId, sourceClinicId, targetClinicId])
+  @@index([petId, revokedAt])
+}
+
+model AccessAudit {
+  id           String   @id
+  recordId     String
+  petId        String
+  actorUserId  String
+  actorRole    String
+  actorClinicId String?
+  action       String
+  reason       String?
+  createdAt    DateTime @default(now())
+  record       EhrRecord @relation(fields: [recordId], references: [id])
+
+  @@index([petId, createdAt])
+  @@index([recordId])
+}

@@ -1,0 +1,87 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../node_modules/@petwell/prisma-appointment-service-client"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum AppointmentStatus {
+  pending_payment
+  confirmed
+  cancelled
+  completed
+  no_show
+}
+
+model ScheduleTemplate {
+  id                  String   @id
+  clinicId            String
+  veterinarianId      String
+  weekday             Int
+  startTime           String
+  endTime             String
+  slotDurationMinutes Int
+  active              Boolean  @default(true)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  @@index([clinicId, veterinarianId, weekday, active])
+}
+
+model ScheduleBlock {
+  id             String   @id
+  clinicId       String
+  veterinarianId String?
+  startsAt       DateTime
+  endsAt         DateTime
+  reason         String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([clinicId, startsAt, endsAt])
+  @@index([veterinarianId, startsAt, endsAt])
+}
+
+model Appointment {
+  id                    String            @id
+  clinicId              String
+  veterinarianId        String
+  ownerId               String
+  petId                 String
+  appointmentType       String
+  startsAt              DateTime
+  endsAt                DateTime
+  status                AppointmentStatus
+  amountCop             Int
+  notes                 String?
+  reminder24hSentAt     DateTime?
+  reminder2hSentAt      DateTime?
+  cancelledAt           DateTime?
+  cancellationReason    String?
+  createdAt             DateTime          @default(now())
+  updatedAt             DateTime          @updatedAt
+
+  @@unique([veterinarianId, startsAt])
+  @@index([clinicId, startsAt])
+  @@index([ownerId, startsAt])
+  @@index([status, startsAt])
+}
+
+model WaitlistEntry {
+  id              String   @id
+  clinicId        String
+  veterinarianId  String?
+  ownerId         String
+  petId           String
+  appointmentType String
+  desiredDate     DateTime
+  active          Boolean  @default(true)
+  notifiedAt      DateTime?
+  fulfilledAt     DateTime?
+  createdAt       DateTime @default(now())
+
+  @@index([clinicId, desiredDate, active])
+}
